@@ -39,7 +39,8 @@ public class InterfaceDelegationIncrementalGeneratorTests
         return CSharpGeneratorDriver.Create(
             generators:
             [
-                new InterfaceDelegationGenerator().AsSourceGenerator()
+                new ExposeGenerator().AsSourceGenerator(),
+                new LiftGenerator().AsSourceGenerator()
             ],
             additionalTexts: Array.Empty<AdditionalText>(),
             parseOptions: CSharpParseOptions.Default,
@@ -51,7 +52,7 @@ public class InterfaceDelegationIncrementalGeneratorTests
         );
     }
 
-    private static GeneratorRunResult Run(
+    private static GeneratorDriverRunResult Run(
         ref GeneratorDriver driver,
         Compilation compilation,
         out Compilation outputCompilation
@@ -62,21 +63,27 @@ public class InterfaceDelegationIncrementalGeneratorTests
             out outputCompilation,
             out _
         );
-        return driver.GetRunResult().Results.Single();
+        return driver.GetRunResult();
     }
 
     private static ImmutableArray<IncrementalStepRunReason> GetReasons(
-        GeneratorRunResult result,
+        GeneratorDriverRunResult result,
         string trackingName
     )
     {
-        return result.TrackedSteps.TryGetValue(trackingName, out var steps)
-            ? [
-                ..steps
-                    .SelectMany(static step => step.Outputs)
-                    .Select(static output => output.Reason)
-            ]
-            : ImmutableArray<IncrementalStepRunReason>.Empty;
+        return [
+            ..result.Results
+                .SelectMany(result => result.TrackedSteps.TryGetValue(trackingName, out var steps)
+                    ? steps
+                    : ImmutableArray<IncrementalGeneratorRunStep>.Empty)
+                .SelectMany(static step => step.Outputs)
+                .Select(static output => output.Reason)
+        ];
+    }
+
+    private static ImmutableArray<GeneratedSourceResult> GetSources(GeneratorDriverRunResult result)
+    {
+        return [..result.Results.SelectMany(static result => result.GeneratedSources)];
     }
 
     private static void AssertNoCompilationErrors(Compilation compilation)
@@ -85,6 +92,47 @@ public class InterfaceDelegationIncrementalGeneratorTests
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
         Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())));
+    }
+
+    [TestCase("_expose", "ExposeSourceOutput", "LiftSourceOutput")]
+    [TestCase("_lift", "LiftSourceOutput", "ExposeSourceOutput")]
+    public void EditingOneFeature_PreservesOtherGeneratorOutputCache(
+        string fieldName,
+        string changedTrackingName,
+        string cachedTrackingName
+    )
+    {
+        const string source = """
+            using Macaron.InterfaceDelegation;
+            public interface IRunner { void Run(); }
+            public sealed class Target : IRunner
+            {
+                public void Run() { }
+                public int Value => 42;
+            }
+            public partial class Wrapper : IRunner
+            {
+                [Expose(typeof(IRunner))] private Target _expose = new();
+                [Lift(filter: new[] { "Value" })] private Target _lift = new();
+            }
+            """;
+        var compilation = CreateCompilation(("Wrapper.cs", source));
+        var driver = CreateTrackedDriver();
+        var original = Run(ref driver, compilation, out var originalCompilation);
+        AssertNoCompilationErrors(originalCompilation);
+        var oldTree = compilation.SyntaxTrees.Single();
+        var newTree = oldTree.WithChangedText(SourceText.From(source.Replace(fieldName, fieldName + "Changed")));
+        var result = Run(ref driver, compilation.ReplaceSyntaxTree(oldTree, newTree), out var outputCompilation);
+
+        AssertNoCompilationErrors(outputCompilation);
+        Assert.That(result.Diagnostics, Is.Empty);
+        Assert.That(GetReasons(result, changedTrackingName), Is.EqualTo(new[] { IncrementalStepRunReason.Modified }));
+        Assert.That(GetReasons(result, cachedTrackingName), Is.EqualTo(new[] { IncrementalStepRunReason.Cached }));
+        var originalCached = original.Results.Single(result => result.TrackedSteps.ContainsKey(cachedTrackingName));
+        var currentCached = result.Results.Single(result => result.TrackedSteps.ContainsKey(cachedTrackingName));
+        Assert.That(currentCached.GeneratedSources.Single().HintName, Is.EqualTo(originalCached.GeneratedSources.Single().HintName));
+        Assert.That(currentCached.GeneratedSources.Single().SourceText.ToString(),
+            Is.EqualTo(originalCached.GeneratedSources.Single().SourceText.ToString()));
     }
 
     [Test]
@@ -139,13 +187,13 @@ public class InterfaceDelegationIncrementalGeneratorTests
             Assert.That(reasons.Count(static reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
             Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
             Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Unchanged), Is.EqualTo(1));
-            Assert.That(result.GeneratedSources, Has.Length.EqualTo(2));
+            Assert.That(GetSources(result), Has.Length.EqualTo(2));
             Assert.That(
-                result.GeneratedSources.Count(static source => source.SourceText.ToString().Contains("_renamedA", StringComparison.Ordinal)),
+                GetSources(result).Count(static source => source.SourceText.ToString().Contains("_renamedA", StringComparison.Ordinal)),
                 Is.EqualTo(1)
             );
             Assert.That(
-                result.GeneratedSources.Count(static source => source.SourceText.ToString().Contains("_implB", StringComparison.Ordinal)),
+                GetSources(result).Count(static source => source.SourceText.ToString().Contains("_implB", StringComparison.Ordinal)),
                 Is.EqualTo(1)
             );
         });
@@ -201,7 +249,7 @@ public class InterfaceDelegationIncrementalGeneratorTests
             Assert.That(sourceReasons.Count(static reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
             Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
             Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Unchanged), Is.EqualTo(1));
-            Assert.That(result.GeneratedSources, Has.Length.EqualTo(2));
+            Assert.That(GetSources(result), Has.Length.EqualTo(2));
         });
     }
 
@@ -252,7 +300,7 @@ public class InterfaceDelegationIncrementalGeneratorTests
         AssertNoCompilationErrors(outputCompilation);
         Assert.Multiple(() =>
         {
-            Assert.That(result.GeneratedSources, Is.Empty);
+            Assert.That(GetSources(result), Is.Empty);
             Assert.That(GetReasons(result, "ExposeAnalysisOutput"), Is.Empty);
             Assert.That(GetReasons(result, "LiftAnalysisOutput"), Is.Empty);
         });
@@ -279,7 +327,7 @@ public class InterfaceDelegationIncrementalGeneratorTests
         var result = Run(ref driver, compilation, out var outputCompilation);
 
         AssertNoCompilationErrors(outputCompilation);
-        Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
+        Assert.That(GetSources(result), Has.Length.EqualTo(1));
     }
 
     [Test]
@@ -326,8 +374,8 @@ public class InterfaceDelegationIncrementalGeneratorTests
         var firstResult = Run(ref driver, compilation, out _);
         Assert.Multiple(() =>
         {
-            Assert.That(firstResult.GeneratedSources, Has.Length.EqualTo(1));
-            Assert.That(firstResult.GeneratedSources[0].SourceText.ToString(), Does.Contain("_a.Run()"));
+            Assert.That(GetSources(firstResult), Has.Length.EqualTo(1));
+            Assert.That(GetSources(firstResult)[0].SourceText.ToString(), Does.Contain("_a.Run()"));
             Assert.That(firstResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0003"), Is.EqualTo(1));
         });
 
@@ -346,8 +394,8 @@ public class InterfaceDelegationIncrementalGeneratorTests
         AssertNoCompilationErrors(outputCompilation);
         Assert.Multiple(() =>
         {
-            Assert.That(secondResult.GeneratedSources, Has.Length.EqualTo(1));
-            Assert.That(secondResult.GeneratedSources[0].SourceText.ToString(), Does.Contain("_b.Run()"));
+            Assert.That(GetSources(secondResult), Has.Length.EqualTo(1));
+            Assert.That(GetSources(secondResult)[0].SourceText.ToString(), Does.Contain("_b.Run()"));
             Assert.That(secondResult.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0003"));
         });
     }
@@ -394,7 +442,7 @@ public class InterfaceDelegationIncrementalGeneratorTests
         var driver = CreateTrackedDriver();
 
         var firstResult = Run(ref driver, compilation, out _);
-        Assert.That(firstResult.GeneratedSources.Single().SourceText.ToString(), Does.Contain("_a.Run()"));
+        Assert.That(GetSources(firstResult).Single().SourceText.ToString(), Does.Contain("_a.Run()"));
 
         var reorderedCompilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(
             compilation.SyntaxTrees.Single(static tree => tree.FilePath == "Contracts.cs"),
@@ -407,8 +455,8 @@ public class InterfaceDelegationIncrementalGeneratorTests
         AssertNoCompilationErrors(outputCompilation);
         Assert.Multiple(() =>
         {
-            Assert.That(secondResult.GeneratedSources, Has.Length.EqualTo(1));
-            Assert.That(secondResult.GeneratedSources[0].SourceText.ToString(), Does.Contain("_b.Run()"));
+            Assert.That(GetSources(secondResult), Has.Length.EqualTo(1));
+            Assert.That(GetSources(secondResult)[0].SourceText.ToString(), Does.Contain("_b.Run()"));
             Assert.That(secondResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0003"), Is.EqualTo(1));
         });
     }

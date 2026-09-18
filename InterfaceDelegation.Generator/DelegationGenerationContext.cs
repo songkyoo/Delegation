@@ -7,37 +7,18 @@ internal readonly record struct DelegationGenerationContext(
     MemberImplementationIndex ImplementationIndex
 )
 {
-    public static DelegationGenerationContext Create(GenerationContext generationContext)
+    public static DelegationGenerationContext Create(
+        ISymbol declaredSymbol,
+        ITypeSymbol delegationTypeSymbol,
+        DelegationDispatch dispatch
+    )
     {
-        var declaredSymbol = generationContext.DeclaredSymbol;
-        var typeSymbol = declaredSymbol.ContainingType;
-        var delegationTypeSymbol = generationContext.DelegationTypeSymbol;
-
         return new DelegationGenerationContext(
-            Dispatch: CreateDispatch(generationContext),
-            ImplementationIndex: MemberComparisonHelper.CreateImplementationIndex(typeSymbol, delegationTypeSymbol)
-        );
-    }
-
-    private static DelegationDispatch CreateDispatch(GenerationContext generationContext)
-    {
-        var declaredSymbol = generationContext.DeclaredSymbol;
-
-        if (generationContext is not ExposeGenerationContext exposeContext
-            || !ExposeGenerationPolicy.RequiresInterfaceDispatch(exposeContext)
-        )
-        {
-            return new DirectDelegationDispatch(declaredSymbol.Name);
-        }
-
-        return declaredSymbol is IFieldSymbol
-            ? new ConstrainedFieldDelegationDispatch(
-                declaredSymbol.Name,
-                exposeContext.DelegationTypeSymbol
+            Dispatch: dispatch,
+            ImplementationIndex: MemberComparisonHelper.CreateImplementationIndex(
+                declaredSymbol.ContainingType,
+                delegationTypeSymbol
             )
-            : new InterfaceCastDelegationDispatch(
-                declaredSymbol.Name,
-                exposeContext.DelegationTypeSymbol
-            );
+        );
     }
 }

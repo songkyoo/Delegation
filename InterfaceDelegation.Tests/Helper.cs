@@ -57,7 +57,7 @@ internal static class Helper
         return (result.Diagnostics, generatedCode);
     }
 
-    public static GeneratorTestResult RunGenerator(string sourceCode)
+    public static GeneratorTestResult RunGenerator(string sourceCode, params IIncrementalGenerator[] generators)
     {
         var attributeAssembly = typeof(ExposeAttribute).Assembly;
         var references = AppDomain
@@ -80,19 +80,29 @@ internal static class Helper
             )
         );
 
-        var generator = new InterfaceDelegationGenerator();
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
+        if (generators.Length == 0)
+        {
+            generators = [new ExposeGenerator(), new LiftGenerator()];
+        }
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators.Select(static generator => generator.AsSourceGenerator())
+        );
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,
             out var outputCompilation,
             out _
         );
-        var result = driver.GetRunResult().Results.Single();
+        var result = driver.GetRunResult();
         var allDiagnostics = outputCompilation
             .GetDiagnostics()
             .Concat(result.Diagnostics)
             .ToImmutableArray();
 
-        return new GeneratorTestResult(allDiagnostics, result.GeneratedSources, outputCompilation);
+        return new GeneratorTestResult(
+            allDiagnostics,
+            result.Results.SelectMany(static result => result.GeneratedSources).ToImmutableArray(),
+            outputCompilation
+        );
     }
 }

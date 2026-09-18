@@ -5,7 +5,7 @@ namespace Macaron.InterfaceDelegation;
 
 internal static class ExposeContextFactory
 {
-    public static GenerationAnalysisResult Create(
+    public static GenerationAnalysisResult<ExposeGenerationContext> Create(
         AttributeData attributeData,
         ISymbol declaredSymbol,
         Compilation compilation,
@@ -16,10 +16,10 @@ internal static class ExposeContextFactory
 
         if (declaredSymbol is IPropertySymbol { Type.IsValueType: true })
         {
-            return new GenerationAnalysisResult(
+            return new GenerationAnalysisResult<ExposeGenerationContext>(
                 Context: null,
                 Diagnostics: ImmutableArray.Create(Diagnostic.Create(
-                    descriptor: GenerationDiagnostics.ValueTypePropertyCannotBeDelegatedRule,
+                    descriptor: ExposeDiagnostics.ValueTypePropertyCannotBeDelegatedRule,
                     location: declaredSymbol.Locations.FirstOrDefault(),
                     messageArgs: [declaredSymbol.Name]
                 ))
@@ -30,10 +30,10 @@ internal static class ExposeContextFactory
 
         if (interfaceTypeSymbol == null)
         {
-            return new GenerationAnalysisResult(
+            return new GenerationAnalysisResult<ExposeGenerationContext>(
                 Context: null,
                 Diagnostics: ImmutableArray.Create(Diagnostic.Create(
-                    descriptor: GenerationDiagnostics.InvalidImplementationTargetRule,
+                    descriptor: ExposeDiagnostics.InvalidImplementationTargetRule,
                     location: AttributeArgumentReader.GetFirstArgumentLocation(attributeData),
                     messageArgs: [constructorArguments[0].Value]
                 ))
@@ -42,10 +42,10 @@ internal static class ExposeContextFactory
 
         if (interfaceTypeSymbol.TypeKind is not TypeKind.Interface || interfaceTypeSymbol.IsUnboundGenericType)
         {
-            return new GenerationAnalysisResult(
+            return new GenerationAnalysisResult<ExposeGenerationContext>(
                 Context: null,
                 Diagnostics: ImmutableArray.Create(Diagnostic.Create(
-                    descriptor: GenerationDiagnostics.InvalidImplementationTargetRule,
+                    descriptor: ExposeDiagnostics.InvalidImplementationTargetRule,
                     location: AttributeArgumentReader.GetFirstArgumentLocation(attributeData),
                     messageArgs: [interfaceTypeSymbol.ToDisplayString()]
                 ))
@@ -63,10 +63,10 @@ internal static class ExposeContextFactory
 
         if (!contractDiagnostics.IsEmpty)
         {
-            return new GenerationAnalysisResult(null, contractDiagnostics);
+            return new GenerationAnalysisResult<ExposeGenerationContext>(null, contractDiagnostics);
         }
 
-        return new GenerationAnalysisResult(
+        return new GenerationAnalysisResult<ExposeGenerationContext>(
             Context: new ExposeGenerationContext(
                 Attribute: attributeData,
                 DeclaredSymbol: declaredSymbol,
@@ -125,7 +125,7 @@ internal static class ExposeContextFactory
             if (!implementationChecker.HasImplementation(interfaceMember))
             {
                 builder.Add(Diagnostic.Create(
-                    descriptor: GenerationDiagnostics.ExposeMemberNotImplementedRule,
+                    descriptor: ExposeDiagnostics.ExposeMemberNotImplementedRule,
                     location: location,
                     messageArgs: [targetTypeSymbol.ToDisplayString(), interfaceMember.ToDisplayString()]
                 ));

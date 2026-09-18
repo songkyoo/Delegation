@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 
 using static Macaron.InterfaceDelegation.DelegationMemberGenerationDecision;
-using static Macaron.InterfaceDelegation.DelegationMemberGenerationMode;
 using static Macaron.InterfaceDelegation.ImplementationMode;
 using static Macaron.InterfaceDelegation.MethodReturnTypeComparison;
 using static Microsoft.CodeAnalysis.Accessibility;
@@ -10,6 +9,20 @@ namespace Macaron.InterfaceDelegation;
 
 internal static class ExposeGenerationPolicy
 {
+    public static DelegationDispatch CreateDispatch(ExposeGenerationContext context)
+    {
+        var declaredSymbol = context.DeclaredSymbol;
+
+        if (!RequiresInterfaceDispatch(context))
+        {
+            return new DirectDelegationDispatch(declaredSymbol.Name);
+        }
+
+        return declaredSymbol is IFieldSymbol
+            ? new ConstrainedFieldDelegationDispatch(declaredSymbol.Name, context.DelegationTypeSymbol)
+            : new InterfaceCastDelegationDispatch(declaredSymbol.Name, context.DelegationTypeSymbol);
+    }
+
     public static bool RequiresInterfaceDispatch(ExposeGenerationContext context)
     {
         var targetTypeSymbol = DelegationTargetSymbol.GetDeclaredType(context.DeclaredSymbol);
@@ -38,23 +51,21 @@ internal static class ExposeGenerationPolicy
     {
         var typeSymbol = context.DeclaredSymbol.ContainingType;
         var symbolName = symbol.Name;
-        var mode = symbolName == typeSymbol.Name || context.Mode == Explicit
-            ? ExplicitInterfaceImplementation
-            : ImplicitInterfaceImplementation;
-        var decision = DelegationMemberGenerationPolicy.GetDecision(
-            mode,
-            targetTypeSymbol: typeSymbol,
-            implicitMemberSymbol: implementationIndex.FindImplicit(
-                symbol,
-                symbolName,
-                returnTypeComparison: Match
-            ),
-            explicitMemberSymbol: implementationIndex.FindExplicit(
-                symbol,
-                symbolName,
-                returnTypeComparison: Match
-            )
-        );
+        var implicitMember = implementationIndex.FindImplicit(symbol, symbolName, Match);
+        var explicitMember = implementationIndex.FindExplicit(symbol, symbolName, Match);
+        var mode = symbolName == typeSymbol.Name ? Explicit : context.Mode;
+        var decision = mode switch
+        {
+            Explicit => explicitMember == null ? GenerateExplicitInterfaceImplementation : Skip,
+            _ => (implicitMember, explicitMember) switch
+            {
+                (null, null) => Generate,
+                ({ IsAbstract: true }, null) when !SymbolEqualityComparer.Default.Equals(
+                    implicitMember.ContainingType, typeSymbol
+                ) => OverrideAbstractMember,
+                _ => Skip,
+            },
+        };
 
         if (decision == Skip)
         {

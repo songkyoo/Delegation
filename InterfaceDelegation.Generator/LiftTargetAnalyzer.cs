@@ -22,7 +22,11 @@ internal static class LiftTargetAnalyzer
 
             if (generationContext != null)
             {
-                TargetGenerationComposer.AppendGeneration(lines, generationContext);
+                TargetGenerationComposer.AppendGeneration(
+                    lines,
+                    generationContext.DelegationTypeSymbol,
+                    LiftGenerationPipeline.Generate(generationContext)
+                );
             }
         }
 

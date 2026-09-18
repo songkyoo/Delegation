@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Macaron.InterfaceDelegation;
 
-internal static class GenerationDiagnostics
+internal static class ExposeDiagnostics
 {
     public static readonly DiagnosticDescriptor InvalidImplementationTargetRule = new(
         id: "MAID0001",
@@ -28,15 +28,6 @@ internal static class GenerationDiagnostics
         messageFormat: "The interface '{0}' is delegated more than once in the same type",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
-
-    public static readonly DiagnosticDescriptor LiftMemberNameNotFoundRule = new(
-        id: "MAID0004",
-        title: "Lift member name was not found",
-        messageFormat: "The member '{0}' was not found on '{1}' for Lift option '{2}'",
-        category: "Usage",
-        defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true
     );
 

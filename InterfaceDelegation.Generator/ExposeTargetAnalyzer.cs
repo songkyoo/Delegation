@@ -18,7 +18,7 @@ internal static class ExposeTargetAnalyzer
     private readonly record struct ExposeApplicationKey(SyntaxTree SyntaxTree, TextSpan Span);
 
     private readonly record struct ExposeAnalysisEntry(
-        GenerationContext? Context,
+        ExposeGenerationContext? Context,
         ImmutableArray<Diagnostic> Diagnostics,
         bool IsCanonical
     );
@@ -122,7 +122,7 @@ internal static class ExposeTargetAnalyzer
 
             diagnostics.AddRange(entry.Diagnostics);
 
-            if (entry.Context is not ExposeGenerationContext exposeContext)
+            if (entry.Context is not { } exposeContext)
             {
                 continue;
             }
@@ -130,7 +130,7 @@ internal static class ExposeTargetAnalyzer
             if (!entry.IsCanonical)
             {
                 diagnostics.Add(Diagnostic.Create(
-                    descriptor: GenerationDiagnostics.DuplicateDelegationTargetRule,
+                    descriptor: ExposeDiagnostics.DuplicateDelegationTargetRule,
                     location: exposeContext.Attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
                     messageArgs: [exposeContext.DelegationTypeSymbol]
                 ));
@@ -138,7 +138,11 @@ internal static class ExposeTargetAnalyzer
                 continue;
             }
 
-            TargetGenerationComposer.AppendGeneration(lines, exposeContext);
+            TargetGenerationComposer.AppendGeneration(
+                lines,
+                exposeContext.DelegationTypeSymbol,
+                ExposeGenerationPipeline.Generate(exposeContext)
+            );
         }
 
         return TargetGenerationComposer.CreateOutput(
@@ -169,8 +173,8 @@ internal static class ExposeTargetAnalyzer
                 compilation,
                 cancellationToken
             );
-            var isCanonical = generationContext is not ExposeGenerationContext exposeContext ||
-                delegatedInterfaces.Add(exposeContext.DelegationTypeSymbol);
+            var isCanonical = generationContext == null ||
+                delegatedInterfaces.Add(generationContext.DelegationTypeSymbol);
             var syntaxReference = application.Attribute.ApplicationSyntaxReference!;
 
             entries.Add(

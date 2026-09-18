@@ -5,7 +5,7 @@ namespace Macaron.InterfaceDelegation;
 
 internal static class LiftContextFactory
 {
-    public static ImmutableArray<GenerationAnalysisResult> CreateAll(
+    public static ImmutableArray<GenerationAnalysisResult<LiftGenerationContext>> CreateAll(
         GeneratorAttributeSyntaxContext context,
         CancellationToken cancellationToken
     )
@@ -14,10 +14,10 @@ internal static class LiftContextFactory
 
         if (!DelegationTargetSymbol.IsSupported(context.TargetSymbol))
         {
-            return ImmutableArray<GenerationAnalysisResult>.Empty;
+            return ImmutableArray<GenerationAnalysisResult<LiftGenerationContext>>.Empty;
         }
 
-        var builder = ImmutableArray.CreateBuilder<GenerationAnalysisResult>(context.Attributes.Length);
+        var builder = ImmutableArray.CreateBuilder<GenerationAnalysisResult<LiftGenerationContext>>(context.Attributes.Length);
 
         foreach (var attributeData in context.Attributes.OrderBy(GetAttributeSpanStart))
         {
@@ -29,7 +29,7 @@ internal static class LiftContextFactory
         return builder.ToImmutable();
     }
 
-    private static GenerationAnalysisResult Create(AttributeData attributeData, ISymbol declaredSymbol)
+    private static GenerationAnalysisResult<LiftGenerationContext> Create(AttributeData attributeData, ISymbol declaredSymbol)
     {
         var constructorArguments = attributeData.ConstructorArguments;
         var includeBaseTypes = attributeData
@@ -51,7 +51,7 @@ internal static class LiftContextFactory
             ? GetConfigurableMembers(delegationTypeSymbol, includeBaseTypes).ToImmutableArray()
             : default;
 
-        return new GenerationAnalysisResult(
+        return new GenerationAnalysisResult<LiftGenerationContext>(
             Context: new LiftGenerationContext(
                 Attribute: attributeData,
                 DeclaredSymbol: declaredSymbol,
@@ -168,7 +168,7 @@ internal static class LiftContextFactory
             }
 
             builder.Add(Diagnostic.Create(
-                descriptor: GenerationDiagnostics.LiftMemberNameNotFoundRule,
+                descriptor: LiftDiagnostics.LiftMemberNameNotFoundRule,
                 location: location,
                 messageArgs: [memberName, delegationTypeSymbol.ToDisplayString(), parameterName]
             ));

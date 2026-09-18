@@ -10,10 +10,12 @@ internal static class TargetGenerationComposer
 {
     private const string Space = "    ";
 
-    public static void AppendGeneration(ImmutableArray<string>.Builder builder, GenerationContext generationContext)
+    public static void AppendGeneration(
+        ImmutableArray<string>.Builder builder,
+        ITypeSymbol delegationTypeSymbol,
+        ImmutableArray<string> lines
+    )
     {
-        var lines = DelegationGenerationPipeline.Generate(generationContext);
-
         if (lines.IsEmpty)
         {
             return;
@@ -24,7 +26,7 @@ internal static class TargetGenerationComposer
             builder.Add("");
         }
 
-        builder.Add($"#region {generationContext.DelegationTypeSymbol.ToDisplayString(FullyQualifiedFormat)}");
+        builder.Add($"#region {delegationTypeSymbol.ToDisplayString(FullyQualifiedFormat)}");
         builder.AddRange(lines);
         builder.Add("#endregion");
     }

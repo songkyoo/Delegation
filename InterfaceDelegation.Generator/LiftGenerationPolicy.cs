@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 
 using static Macaron.InterfaceDelegation.DelegationMemberGenerationDecision;
-using static Macaron.InterfaceDelegation.DelegationMemberGenerationMode;
 using static Macaron.InterfaceDelegation.MethodReturnTypeComparison;
 using static Microsoft.CodeAnalysis.Accessibility;
 
@@ -38,20 +37,15 @@ internal static class LiftGenerationPolicy
         var symbolName = context.Rename.TryGetValue(symbol.Name, out var renamed)
             ? renamed
             : symbol.Name;
-        var decision = DelegationMemberGenerationPolicy.GetDecision(
-            mode: Lift,
-            targetTypeSymbol: typeSymbol,
-            implicitMemberSymbol: implementationIndex.FindImplicit(
-                symbol,
-                symbolName,
-                returnTypeComparison: Ignore
-            ),
-            explicitMemberSymbol: implementationIndex.FindExplicit(
-                symbol,
-                symbolName,
-                returnTypeComparison: Ignore
-            )
-        );
+        var implicitMember = implementationIndex.FindImplicit(symbol, symbolName, Ignore);
+        var decision = implicitMember switch
+        {
+            null => Generate,
+            { IsAbstract: true } when !SymbolEqualityComparer.Default.Equals(
+                implicitMember.ContainingType, typeSymbol
+            ) => OverrideAbstractMember,
+            _ => Skip,
+        };
 
         if (decision == Skip)
         {
