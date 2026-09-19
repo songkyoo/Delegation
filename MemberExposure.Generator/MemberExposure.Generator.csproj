@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <AnalyzerLanguage>cs</AnalyzerLanguage>
-    <AssemblyName>Macaron.InterfaceDelegation.Generator</AssemblyName>
+    <AssemblyName>Macaron.MemberExposure.Generator</AssemblyName>
     <DevelopmentDependency>true</DevelopmentDependency>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -12,7 +12,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <OutputType>Library</OutputType>
-    <RootNamespace>Macaron.InterfaceDelegation</RootNamespace>
+    <RootNamespace>Macaron.MemberExposure</RootNamespace>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
@@ -26,7 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\InterfaceDelegation.Attribute\InterfaceDelegation.Attribute.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MemberExposure.Attribute\MemberExposure.Attribute.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <Import Project="..\Shared\GeneratorSources.props" />

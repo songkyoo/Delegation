@@ -21,12 +21,17 @@
   <ItemGroup>
     <ProjectReference Include="..\InterfaceDelegation.Attribute\InterfaceDelegation.Attribute.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\InterfaceDelegation.Generator\InterfaceDelegation.Generator.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MemberExposure.Attribute\MemberExposure.Attribute.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MemberExposure.Generator\MemberExposure.Generator.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\InterfaceDelegation.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.InterfaceDelegation.Attribute.dll" Pack="true" PackagePath="lib/netstandard2.0" />
     <None Include="..\InterfaceDelegation.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.InterfaceDelegation.Attribute.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
     <None Include="..\InterfaceDelegation.Generator\bin\$(Configuration)\netstandard2.0\Macaron.InterfaceDelegation.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
+    <None Include="..\MemberExposure.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Attribute.dll" Pack="true" PackagePath="lib/netstandard2.0" />
+    <None Include="..\MemberExposure.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Attribute.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
+    <None Include="..\MemberExposure.Generator\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
   </ItemGroup>
 
 </Project>
