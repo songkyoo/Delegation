@@ -1,8 +1,8 @@
 <Project>
 
   <PropertyGroup>
-    <InterfaceDelegationVersion>0.1.0</InterfaceDelegationVersion>
-    <MemberExposureVersion>0.1.0</MemberExposureVersion>
+    <InterfaceDelegationVersion>1.0.0</InterfaceDelegationVersion>
+    <MemberExposureVersion>1.0.0</MemberExposureVersion>
   </PropertyGroup>
 
 </Project>
