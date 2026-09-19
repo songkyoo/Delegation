@@ -31,7 +31,7 @@ public sealed class ImplementEventTests
 
             public partial class TestEventDelegation : INotifier
             {
-                [Implement(typeof(INotifier), ImplementationMode.Implicit)]
+                [Implement(typeof(INotifier), Mode = ImplementationMode.Implicit)]
                 private readonly INotifier _impl = new NotifierImpl();
             }
             """,
@@ -86,7 +86,7 @@ public sealed class ImplementEventTests
 
             public partial class TestEventDelegation : TestEventDelegationBase, INotifier
             {
-                [Implement(typeof(INotifier), ImplementationMode.Implicit)]
+                [Implement(typeof(INotifier), Mode = ImplementationMode.Implicit)]
                 private readonly INotifier _impl = new NotifierImpl();
             }
             """,
@@ -136,7 +136,7 @@ public sealed class ImplementEventTests
 
             public partial class TestEventDelegation : INotifier
             {
-                [Implement(typeof(INotifier), ImplementationMode.Implicit)]
+                [Implement(typeof(INotifier), Mode = ImplementationMode.Implicit)]
                 private INotifier Impl { get; } = new NotifierImpl();
             }
             """,
@@ -186,7 +186,7 @@ public sealed class ImplementEventTests
 
             public partial class TestExplicitEventDelegation : INotifier
             {
-                [Implement(typeof(INotifier), ImplementationMode.Explicit)]
+                [Implement(typeof(INotifier), Mode = ImplementationMode.Explicit)]
                 private readonly INotifier _impl = new NotifierImpl();
             }
             """,
@@ -240,7 +240,7 @@ public sealed class ImplementEventTests
 
             public partial class TestPartialDefaultEvent : INotifier
             {
-                [Implement(typeof(INotifier), ImplementationMode.Implicit)]
+                [Implement(typeof(INotifier), Mode = ImplementationMode.Implicit)]
                 private readonly INotifier _impl = new NotifierImpl();
 
                 public event EventHandler? Changed;
@@ -298,7 +298,7 @@ public sealed class ImplementEventTests
 
             public partial class TestEventDelegation : TestEventDelegationBase, INotifier
             {
-                [Implement(typeof(INotifier), ImplementationMode.Implicit)]
+                [Implement(typeof(INotifier), Mode = ImplementationMode.Implicit)]
                 private readonly INotifier _impl = new NotifierImpl();
 
                 public override event EventHandler? Changed
@@ -355,7 +355,7 @@ public sealed class ImplementEventTests
 
             public partial class TestEventDelegation : INotifier
             {
-                [Implement(typeof(INotifier), ImplementationMode.Implicit)]
+                [Implement(typeof(INotifier), Mode = ImplementationMode.Implicit)]
                 private readonly NotifierImpl _impl = new NotifierImpl();
             }
             """,

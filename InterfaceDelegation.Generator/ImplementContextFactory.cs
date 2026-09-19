@@ -72,7 +72,7 @@ internal static class ImplementContextFactory
                 Attribute: attributeData,
                 DeclaredSymbol: declaredSymbol,
                 DelegationTypeSymbol: interfaceTypeSymbol,
-                Mode: GetImplementationMode(constructorArguments)
+                Mode: GetImplementationMode(attributeData)
             ),
             Diagnostics: ImmutableArray<Diagnostic>.Empty
         );
@@ -136,9 +136,18 @@ internal static class ImplementContextFactory
         return builder.ToImmutable();
     }
 
-    private static ImplementationMode GetImplementationMode(ImmutableArray<TypedConstant> constructorArguments)
+    private static ImplementationMode GetImplementationMode(AttributeData attributeData)
     {
-        return (ImplementationMode)(constructorArguments[1].Value ?? 0) switch
+        var mode = attributeData.NamedArguments
+            .FirstOrDefault(static argument => argument.Key == nameof(ImplementAttribute.Mode))
+            .Value.Value;
+
+        if (mode is null)
+        {
+            return ImplementationMode.Explicit;
+        }
+
+        return (ImplementationMode)mode switch
         {
             var value and ImplementationMode.Explicit => value,
             _ => ImplementationMode.Implicit,

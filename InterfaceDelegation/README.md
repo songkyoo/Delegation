@@ -39,13 +39,13 @@ partial class Wrapper : IRunner
 
 ## 구현 모드
 
-위임할 인터페이스는 명시적이거나 암시적으로 구현할 수 있으며 `Implement` 어트리뷰트의 두 번째 인자에 `ImplementationMode` 열거형을 지정하여 결정할 수 있습니다.
+위임할 인터페이스는 명시적이거나 암시적으로 구현할 수 있으며 `Implement` 어트리뷰트의 `Mode` 프로퍼티에 `ImplementationMode` 열거형을 지정하여 결정할 수 있습니다.
 
 - 생성할 멤버의 이름이 바깥 타입 이름과 같으면 명시적 인터페이스 구현을 사용합니다.
 - Explicit 모드인 경우 인터페이스 멤버에 대해서 이미 동일한 명시적 구현이 있다면 코드를 생성하지 않습니다. 명시적이지 않은 동일한 구현이 있다면 무시됩니다. Implicit 모드에서는 기존 암시적·명시적 구현을 모두 고려합니다.
 
 ```csharp
-[Implement(typeof(IRunner), ImplementationMode.Implicit)]
+[Implement(typeof(IRunner), Mode = ImplementationMode.Implicit)]
 private readonly Runner _runner = new();
 ```
 
@@ -54,7 +54,7 @@ private readonly Runner _runner = new();
 ```csharp
 public partial class ImplicitWrapper(IRunner runner) : IRunner
 {
-    [Implement(mode: ImplementationMode.Implicit)]
+    [Implement(Mode = ImplementationMode.Implicit)]
     private readonly IRunner _runner = runner;
 }
 ```

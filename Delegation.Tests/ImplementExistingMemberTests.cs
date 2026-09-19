@@ -138,7 +138,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestPartialImplicit : IFoo
             {
-                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
+                [Implement(typeof(IFoo), Mode = ImplementationMode.Implicit)]
                 private readonly IFoo _impl = new FooImpl();
             }
             """,
@@ -190,7 +190,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestPartialImplicit : IFoo
             {
-                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
+                [Implement(typeof(IFoo), Mode = ImplementationMode.Implicit)]
                 private readonly IFoo _impl = new FooImpl();
 
                 public void MethodA() { }
@@ -241,7 +241,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestPartialImplicit : IFoo
             {
-                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
+                [Implement(typeof(IFoo), Mode = ImplementationMode.Implicit)]
                 private readonly IFoo _impl = new FooImpl();
 
                 void IFoo.MethodA() { }
@@ -288,7 +288,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestExplicitMode : IService
             {
-                [Implement(typeof(IService), ImplementationMode.Explicit)]
+                [Implement(typeof(IService), Mode = ImplementationMode.Explicit)]
                 private readonly IService _impl = new ServiceImpl();
             }
             """,
@@ -337,7 +337,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestPartialExplicit : IFoo
             {
-                [Implement(typeof(IFoo), ImplementationMode.Explicit)]
+                [Implement(typeof(IFoo), Mode = ImplementationMode.Explicit)]
                 private readonly IFoo _impl = new FooImpl();
 
                 void IFoo.MethodA() { }
@@ -388,7 +388,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestPartialExplicit : IFoo
             {
-                [Implement(typeof(IFoo), ImplementationMode.Explicit)]
+                [Implement(typeof(IFoo), Mode = ImplementationMode.Explicit)]
                 private readonly IFoo _impl = new FooImpl();
 
                 public void MethodA() { }
@@ -442,7 +442,7 @@ public sealed class ImplementExistingMemberTests
 
             public abstract partial class TestAbstractDelegation : IAbstractExample
             {
-                [Implement(typeof(IAbstractExample), ImplementationMode.Implicit)]
+                [Implement(typeof(IAbstractExample), Mode = ImplementationMode.Implicit)]
                 private readonly IAbstractExample _impl = new AbstractExampleImpl();
 
                 public abstract int GetAnswer();
@@ -500,7 +500,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestAbstractDelegation : TestAbstractDelegationBase, IAbstractExample
             {
-                [Implement(typeof(IAbstractExample), ImplementationMode.Implicit)]
+                [Implement(typeof(IAbstractExample), Mode = ImplementationMode.Implicit)]
                 private readonly IAbstractExample _impl = new AbstractExampleImpl();
             }
             """,
@@ -565,7 +565,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestAbstractDelegation : TestAbstractDelegationBase
             {
-                [Implement(typeof(IAbstractExample), ImplementationMode.Implicit)]
+                [Implement(typeof(IAbstractExample), Mode = ImplementationMode.Implicit)]
                 private readonly IAbstractExample _impl = new AbstractExampleImpl();
 
                 public override int GetAnswer() => 42;
