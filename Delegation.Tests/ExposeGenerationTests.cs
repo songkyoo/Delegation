@@ -383,7 +383,7 @@ public sealed class ExposeGenerationTests
 
             public partial class Wrapper : IFoo
             {
-                [Implement(typeof(IFoo))]
+                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
                 [Expose(filter: new[] { "Value" })]
                 private readonly Foo _impl = new();
             }

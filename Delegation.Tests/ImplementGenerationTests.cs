@@ -44,7 +44,7 @@ public sealed class ImplementGenerationTests
                 partial class TestClass
                 {
                     #region global::Macaron.Delegation.Tests.IGreeter
-                    public string Greet(string name)
+                    string global::Macaron.Delegation.Tests.IGreeter.Greet(string name)
                         => _impl.Greet(name);
                     #endregion
                 }
@@ -75,7 +75,7 @@ public sealed class ImplementGenerationTests
 
             public partial class TestClass : IGreeter
             {
-                [Implement(typeof(IGreeter))]
+                [Implement(typeof(IGreeter), ImplementationMode.Implicit)]
                 private readonly IGreeter _impl = new RealGreeter();
             }
             """,
@@ -120,7 +120,7 @@ public sealed class ImplementGenerationTests
 
             public partial class TestClass : IGreeter
             {
-                [Implement(typeof(IGreeter))]
+                [Implement(typeof(IGreeter), ImplementationMode.Implicit)]
                 private IGreeter Impl { get; } = new RealGreeter();
             }
             """,
@@ -179,7 +179,7 @@ public sealed class ImplementGenerationTests
 
             public partial class TestClass : IGreeterC
             {
-                [Implement(typeof(IGreeterC))]
+                [Implement(typeof(IGreeterC), ImplementationMode.Implicit)]
                 private IGreeterC Impl { get; } = new RealGreeter();
             }
             """,
@@ -237,8 +237,8 @@ public sealed class ImplementGenerationTests
 
             public partial class TestClass : IGreeterA, IGreeterB
             {
-                [Implement(typeof(IGreeterA))]
-                [Implement(typeof(IGreeterB))]
+                [Implement(typeof(IGreeterA), ImplementationMode.Implicit)]
+                [Implement(typeof(IGreeterB), ImplementationMode.Implicit)]
                 private RealGreeter Impl { get; } = new RealGreeter();
             }
             """,
@@ -412,10 +412,10 @@ public sealed class ImplementGenerationTests
 
             public partial class TestClass : IGreeterA, IGreeterB
             {
-                [Implement(typeof(IGreeterA))]
+                [Implement(typeof(IGreeterA), ImplementationMode.Implicit)]
                 private IGreeterA ImplA { get; } = new RealGreeter();
 
-                [Implement(typeof(IGreeterB))]
+                [Implement(typeof(IGreeterB), ImplementationMode.Implicit)]
                 private IGreeterB ImplB { get; } = new RealGreeter();
             }
             """,
@@ -482,7 +482,7 @@ public sealed class ImplementGenerationTests
 
             public partial class BoundedGenericInterfaceDelegation : IFoo<int, string>
             {
-                [Implement(typeof(IFoo<int, string>))]
+                [Implement(typeof(IFoo<int, string>), ImplementationMode.Implicit)]
                 private readonly FooImpl _impl = new FooImpl();
             }
             """,
@@ -564,7 +564,7 @@ public sealed class ImplementGenerationTests
 
             public partial class TestPropertyDelegation : IPropertyExample
             {
-                [Implement(typeof(IPropertyExample))]
+                [Implement(typeof(IPropertyExample), ImplementationMode.Implicit)]
                 private readonly IPropertyExample _impl = new PropertyExampleImpl();
             }
             """,
@@ -627,7 +627,7 @@ public sealed class ImplementGenerationTests
 
             public partial class TestMethodOverloads : ICalculator
             {
-                [Implement(typeof(ICalculator))]
+                [Implement(typeof(ICalculator), ImplementationMode.Implicit)]
                 private readonly ICalculator _impl = new CalculatorImpl();
             }
             """,
@@ -675,7 +675,7 @@ public sealed class ImplementGenerationTests
 
             public partial struct TestStructDelegation : IStructInterface
             {
-                [Implement(typeof(IStructInterface))]
+                [Implement(typeof(IStructInterface), ImplementationMode.Implicit)]
                 private readonly IStructInterface _impl;
 
                 public TestStructDelegation()
@@ -723,7 +723,7 @@ public sealed class ImplementGenerationTests
                 public void DoSomething() { }
             }
 
-            public partial record TestRecordDelegation([Implement(typeof(IRecordInterface))] IRecordInterface Impl) : IRecordInterface
+            public partial record TestRecordDelegation([Implement(typeof(IRecordInterface), ImplementationMode.Implicit)] IRecordInterface Impl) : IRecordInterface
             {
             }
             """,
@@ -766,7 +766,7 @@ public sealed class ImplementGenerationTests
                 public void DoSomething() { }
             }
 
-            public partial record struct TestRecordDelegation([Implement(typeof(IRecordInterface))] IRecordInterface Impl) : IRecordInterface
+            public partial record struct TestRecordDelegation([Implement(typeof(IRecordInterface), ImplementationMode.Implicit)] IRecordInterface Impl) : IRecordInterface
             {
             }
             """,
@@ -811,7 +811,7 @@ public sealed class ImplementGenerationTests
 
             public partial class TestGenericDelegation : IGenericExample
             {
-                [Implement(typeof(IGenericExample))]
+                [Implement(typeof(IGenericExample), ImplementationMode.Implicit)]
                 private readonly IGenericExample _impl = new GenericExampleImpl();
             }
             """,
@@ -858,10 +858,10 @@ public sealed class ImplementGenerationTests
             {
                 private readonly IFoo _indexerValue = new Foo();
 
-                [Implement(typeof(IFoo))]
+                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
                 public IFoo this[int index] => _indexerValue;
 
-                [Implement(typeof(IFoo))]
+                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
                 private readonly IFoo _impl = new Foo();
             }
             """;

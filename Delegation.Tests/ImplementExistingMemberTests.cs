@@ -9,7 +9,7 @@ namespace Macaron.Delegation.Tests;
 public sealed class ImplementExistingMemberTests
 {
     [Test]
-    public void SkipsAlreadyImplementedImplicitMembers_When_UsingDefaultMode()
+    public void GeneratesExplicitDelegation_EvenIfImplicitExists_When_UsingDefaultMode()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -49,7 +49,10 @@ public sealed class ImplementExistingMemberTests
                 partial class TestPartialDefaultImplicit
                 {
                     #region global::Macaron.Delegation.Tests.IFoo
-                    public void MethodB()
+                    void global::Macaron.Delegation.Tests.IFoo.MethodA()
+                        => _impl.MethodA();
+
+                    void global::Macaron.Delegation.Tests.IFoo.MethodB()
                         => _impl.MethodB();
                     #endregion
                 }
@@ -100,7 +103,7 @@ public sealed class ImplementExistingMemberTests
                 partial class TestPartialDefaultExplicit
                 {
                     #region global::Macaron.Delegation.Tests.IFoo
-                    public void MethodB()
+                    void global::Macaron.Delegation.Tests.IFoo.MethodB()
                         => _impl.MethodB();
                     #endregion
                 }
@@ -439,7 +442,7 @@ public sealed class ImplementExistingMemberTests
 
             public abstract partial class TestAbstractDelegation : IAbstractExample
             {
-                [Implement(typeof(IAbstractExample))]
+                [Implement(typeof(IAbstractExample), ImplementationMode.Implicit)]
                 private readonly IAbstractExample _impl = new AbstractExampleImpl();
 
                 public abstract int GetAnswer();
@@ -497,7 +500,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestAbstractDelegation : TestAbstractDelegationBase, IAbstractExample
             {
-                [Implement(typeof(IAbstractExample))]
+                [Implement(typeof(IAbstractExample), ImplementationMode.Implicit)]
                 private readonly IAbstractExample _impl = new AbstractExampleImpl();
             }
             """,
@@ -562,7 +565,7 @@ public sealed class ImplementExistingMemberTests
 
             public partial class TestAbstractDelegation : TestAbstractDelegationBase
             {
-                [Implement(typeof(IAbstractExample))]
+                [Implement(typeof(IAbstractExample), ImplementationMode.Implicit)]
                 private readonly IAbstractExample _impl = new AbstractExampleImpl();
 
                 public override int GetAnswer() => 42;

@@ -22,7 +22,7 @@ public sealed class GeneratorIsolationTests
         }
         public partial class Wrapper
         {
-            [Implement(typeof(IRunner))]
+            [Implement(typeof(IRunner), ImplementationMode.Implicit)]
             [Expose(filter: new[] { "Value" })]
             private Target _target = new();
         }
@@ -106,7 +106,7 @@ public sealed class GeneratorIsolationTests
     public void Expose_CompilesWithoutInterfaceDelegationReference()
     {
         var source = Source.Replace("using Macaron.InterfaceDelegation;", "")
-            .Replace("[Implement(typeof(IRunner))]", "");
+            .Replace("[Implement(typeof(IRunner), ImplementationMode.Implicit)]", "");
         var result = RunGeneratorWithReferences(source, CreateReferences(typeof(ExposeAttribute)), new ExposeGenerator());
 
         AssertSuccessfulGeneration(result);

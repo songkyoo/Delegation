@@ -8,7 +8,7 @@ namespace Macaron.InterfaceDelegation;
 [AttributeUsage(validOn: Property | Field | Parameter, AllowMultiple = true)]
 public sealed class ImplementAttribute(
     Type? interfaceType = null,
-    ImplementationMode mode = ImplementationMode.Implicit
+    ImplementationMode mode = ImplementationMode.Explicit
 ) : Attribute
 {
     public Type? InterfaceType { get; } = interfaceType;

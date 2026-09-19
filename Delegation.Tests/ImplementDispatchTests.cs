@@ -28,7 +28,7 @@ public sealed class ImplementDispatchTests
 
             public partial class Wrapper : IFoo
             {
-                [Implement(typeof(IFoo))]
+                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
                 private readonly Foo _impl = new();
             }
             """;
@@ -68,7 +68,7 @@ public sealed class ImplementDispatchTests
 
             public partial class Wrapper : IFoo
             {
-                [Implement(typeof(IFoo))]
+                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
                 private readonly Foo _impl = new();
             }
             """;
@@ -116,7 +116,7 @@ public sealed class ImplementDispatchTests
 
             public partial class Wrapper : IFoo
             {
-                [Implement(typeof(IFoo))]
+                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
                 private readonly DuckFoo _impl = new();
             }
             """;
@@ -154,7 +154,7 @@ public sealed class ImplementDispatchTests
 
             public partial class Wrapper : IFoo
             {
-                [Implement(typeof(IFoo))]
+                [Implement(typeof(IFoo), ImplementationMode.Implicit)]
                 private readonly Foo _impl = new();
             }
             """;
