@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Macaron.MemberExposure</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Macaron.MemberExposure</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Version>$(MemberExposureVersion)</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Gyu Song</Authors>
+    <PackageId>Macaron.MemberExposure</PackageId>
+    <PackageLicenseExpression>Unlicense</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/songkyoo/Delegation</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MemberExposure.Attribute\MemberExposure.Attribute.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MemberExposure.Generator\MemberExposure.Generator.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\MemberExposure.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Attribute.dll" Pack="true" PackagePath="lib/netstandard2.0" />
+    <None Include="..\MemberExposure.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Attribute.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
+    <None Include="..\MemberExposure.Generator\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

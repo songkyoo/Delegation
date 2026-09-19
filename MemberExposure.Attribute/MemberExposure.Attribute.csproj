@@ -1,12 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>Macaron.MemberExposure.Attribute</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <RootNamespace>Macaron.MemberExposure</RootNamespace>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <Version>$(MemberExposureVersion)</Version>
   </PropertyGroup>
 
 </Project>

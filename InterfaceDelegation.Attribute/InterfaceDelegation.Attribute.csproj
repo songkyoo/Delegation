@@ -1,12 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>Macaron.InterfaceDelegation.Attribute</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <RootNamespace>Macaron.InterfaceDelegation</RootNamespace>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <Version>$(InterfaceDelegationVersion)</Version>
   </PropertyGroup>
 
 </Project>

@@ -4,5 +4,6 @@
   <Project Path="InterfaceDelegation.Generator/InterfaceDelegation.Generator.csproj" />
   <Project Path="Delegation.Tests/Delegation.Tests.csproj" />
   <Project Path="MemberExposure.Attribute/MemberExposure.Attribute.csproj" />
+  <Project Path="MemberExposure/MemberExposure.csproj" />
   <Project Path="MemberExposure.Generator/MemberExposure.Generator.csproj" />
 </Solution>

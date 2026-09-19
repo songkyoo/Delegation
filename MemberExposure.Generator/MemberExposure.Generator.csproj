@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AnalyzerLanguage>cs</AnalyzerLanguage>
@@ -6,6 +6,7 @@
     <DevelopmentDependency>true</DevelopmentDependency>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IncludeSymbols>false</IncludeSymbols>
     <IsRoslynComponent>true</IsRoslynComponent>
@@ -15,6 +16,7 @@
     <RootNamespace>Macaron.MemberExposure</RootNamespace>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <Version>$(MemberExposureVersion)</Version>
   </PropertyGroup>
 
   <ItemGroup>
