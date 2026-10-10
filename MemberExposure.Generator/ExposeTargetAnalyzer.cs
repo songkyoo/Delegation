@@ -11,6 +11,19 @@ internal static class ExposeTargetAnalyzer
         CancellationToken cancellationToken
     )
     {
+        if (PartialTypeValidator.GetNonPartialType(attributeContext.TargetSymbol.ContainingType, cancellationToken)
+            is { } nonPartialType)
+        {
+            return new TargetGenerationOutput(
+                Source: null,
+                Diagnostics: ImmutableArray.Create(Diagnostic.Create(
+                    descriptor: ExposeDiagnostics.ContainingTypeMustBePartialRule,
+                    location: attributeContext.Attributes[0].ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
+                    messageArgs: [nonPartialType.ToDisplayString()]
+                ))
+            );
+        }
+
         var results = ExposeContextFactory.CreateAll(attributeContext, cancellationToken);
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         var lines = ImmutableArray.CreateBuilder<string>();

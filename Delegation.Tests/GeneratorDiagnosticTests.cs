@@ -9,6 +9,83 @@ namespace Macaron.Delegation.Tests;
 [TestFixture]
 public sealed class GeneratorDiagnosticTests
 {
+    [Test]
+    public void NonPartialImplementType_ReportsErrorWithoutGeneratingSource()
+    {
+        const string source = """
+            using Macaron.InterfaceDelegation;
+            public interface IRunner { void Run(); }
+            public sealed class Runner : IRunner { public void Run() { } }
+            public class Wrapper
+            {
+                [Implement(typeof(IRunner))] private readonly Runner _runner = new();
+            }
+            """;
+
+        var result = RunGenerator(source);
+        var diagnostic = result.Diagnostics.Single(static diagnostic => diagnostic.Id == "MAID0001");
+
+        Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
+        Assert.That(diagnostic.GetMessage(), Is.EqualTo("Type 'Wrapper' must be declared partial to use Implement"));
+        Assert.That(diagnostic.Location.SourceSpan.Start, Is.EqualTo(source.IndexOf("Implement(", StringComparison.Ordinal)));
+        Assert.That(result.GeneratedSources, Is.Empty);
+        Assert.That(result.OutputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+    }
+
+    [Test]
+    public void NonPartialExposeType_ReportsErrorWithoutGeneratingSource()
+    {
+        const string source = """
+            using Macaron.MemberExposure;
+            public sealed class Worker { public void Run() { } }
+            public class Wrapper
+            {
+                [Expose] private readonly Worker _worker = new();
+            }
+            """;
+
+        var result = RunGenerator(source);
+        var diagnostic = result.Diagnostics.Single(static diagnostic => diagnostic.Id == "MAME0001");
+
+        Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
+        Assert.That(diagnostic.GetMessage(), Is.EqualTo("Type 'Wrapper' must be declared partial to use Expose"));
+        Assert.That(diagnostic.Location.SourceSpan.Start, Is.EqualTo(source.IndexOf("Expose]", StringComparison.Ordinal)));
+        Assert.That(result.GeneratedSources, Is.Empty);
+        Assert.That(result.OutputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+    }
+
+    [Test]
+    public void NonPartialOuterType_ReportsBothFeatureErrorsWithoutGeneratingSource()
+    {
+        const string source = """
+            using Macaron.InterfaceDelegation;
+            using Macaron.MemberExposure;
+            public interface IRunner { void Run(); }
+            public sealed class Runner : IRunner { public void Run() { } }
+            public class Outer
+            {
+                public partial class Wrapper
+                {
+                    [Implement(typeof(IRunner))] private readonly Runner _runner = new();
+                    [Expose] private readonly Runner _exposed = new();
+                }
+            }
+            """;
+
+        var result = RunGenerator(source);
+        var diagnostics = result.Diagnostics.Where(static diagnostic => diagnostic.Id is "MAID0001" or "MAME0001").ToArray();
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Is.EquivalentTo(new[] { "MAID0001", "MAME0001" }));
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage()),
+            Is.EquivalentTo(new[]
+            {
+                "Type 'Outer' must be declared partial to use Implement",
+                "Type 'Outer' must be declared partial to use Expose",
+            }));
+        Assert.That(result.GeneratedSources, Is.Empty);
+        Assert.That(result.OutputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+    }
+
     [TestCase("int")]
     [TestCase("System.Collections.Generic.IEnumerable<>")]
     public void InvalidImplementInterface_ReportsAccurateMessageAndLocation(string typeName)
@@ -21,7 +98,7 @@ public sealed class GeneratorDiagnosticTests
             }
             """;
         var result = RunGenerator(source);
-        var diagnostic = result.Diagnostics.Single(static diagnostic => diagnostic.Id == "MAID0001");
+        var diagnostic = result.Diagnostics.Single(static diagnostic => diagnostic.Id == "MAID0002");
 
         Assert.That(result.GeneratedSources, Is.Empty);
         Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
@@ -52,7 +129,7 @@ public sealed class GeneratorDiagnosticTests
 
         var (diagnostics, _) = CompileAndGetResults(sourceCode);
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAID0002"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAID0003"));
     }
 
     [Test]
@@ -86,7 +163,7 @@ public sealed class GeneratorDiagnosticTests
 
         var (diagnostics, _) = CompileAndGetResults(sourceCode);
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAID0003"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAID0004"));
     }
 
     [Test]
@@ -115,19 +192,19 @@ public sealed class GeneratorDiagnosticTests
             """;
 
         var (diagnostics, _) = CompileAndGetResults(sourceCode);
-        var mame0001Diagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == "MAME0001")
+        var mame0002Diagnostics = diagnostics
+            .Where(diagnostic => diagnostic.Id == "MAME0002")
             .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
             .ToArray();
 
-        Assert.That(mame0001Diagnostics, Has.Length.EqualTo(3));
-        Assert.That(mame0001Diagnostics.Select(diagnostic => diagnostic.GetMessage()), Is.EqualTo(new[]
+        Assert.That(mame0002Diagnostics, Has.Length.EqualTo(3));
+        Assert.That(mame0002Diagnostics.Select(diagnostic => diagnostic.GetMessage()), Is.EqualTo(new[]
         {
             "The member 'MissingFilter' was not found on 'Macaron.Delegation.Tests.ExposeTarget' for Expose option 'filter'",
             "The member 'MissingRemove' was not found on 'Macaron.Delegation.Tests.ExposeTarget' for Expose option 'remove'",
             "The member 'MissingRename' was not found on 'Macaron.Delegation.Tests.ExposeTarget' for Expose option 'rename'",
         }));
-        Assert.That(mame0001Diagnostics.Select(diagnostic => diagnostic.Location.SourceSpan.Start), Is.EqualTo(new[]
+        Assert.That(mame0002Diagnostics.Select(diagnostic => diagnostic.Location.SourceSpan.Start), Is.EqualTo(new[]
         {
             sourceCode.IndexOf("\"MissingFilter\"", StringComparison.Ordinal),
             sourceCode.IndexOf("\"MissingRemove\"", StringComparison.Ordinal),
@@ -166,16 +243,16 @@ public sealed class GeneratorDiagnosticTests
             """;
 
         var (diagnostics, generatedCode) = CompileAndGetResults(sourceCode);
-        var maid0005Diagnostics = diagnostics
+        var maid0006Diagnostics = diagnostics
             .Where(diagnostic => diagnostic.Id == "MAID0005")
             .OrderBy(diagnostic => diagnostic.GetMessage(), StringComparer.Ordinal)
             .ToArray();
-        var messages = maid0005Diagnostics
+        var messages = maid0006Diagnostics
             .Select(diagnostic => diagnostic.GetMessage())
             .ToArray();
 
         Assert.That(generatedCode, Is.Empty);
-        Assert.That(maid0005Diagnostics, Has.Length.EqualTo(2));
+        Assert.That(maid0006Diagnostics, Has.Length.EqualTo(2));
         Assert.That(messages.Any(message => message.Contains("FooImpl", StringComparison.Ordinal) && message.Contains("IFoo.Count", StringComparison.Ordinal)), Is.True);
         Assert.That(messages.Any(message => message.Contains("FooImpl", StringComparison.Ordinal) && message.Contains("Run", StringComparison.Ordinal)), Is.True);
     }
@@ -213,13 +290,13 @@ public sealed class GeneratorDiagnosticTests
             """;
 
         var (diagnostics, generatedCode) = CompileAndGetResults(sourceCode);
-        var maid0005Diagnostics = diagnostics
+        var maid0006Diagnostics = diagnostics
             .Where(diagnostic => diagnostic.Id == "MAID0005")
             .ToArray();
 
         Assert.That(generatedCode, Is.Empty);
-        Assert.That(maid0005Diagnostics, Has.Length.EqualTo(1));
-        Assert.That(maid0005Diagnostics[0].GetMessage(), Does.Contain("INotifier.Changed"));
+        Assert.That(maid0006Diagnostics, Has.Length.EqualTo(1));
+        Assert.That(maid0006Diagnostics[0].GetMessage(), Does.Contain("INotifier.Changed"));
     }
 
     [Test]

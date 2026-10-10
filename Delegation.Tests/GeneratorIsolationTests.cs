@@ -82,9 +82,9 @@ public sealed class GeneratorIsolationTests
         var expose = RunGenerator(source, new ExposeGenerator());
         var combined = RunGenerator(source);
 
-        Assert.That(implement.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "MAID0001" }));
-        Assert.That(expose.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "MAME0001" }));
-        Assert.That(combined.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EquivalentTo(new[] { "MAID0001", "MAME0001" }));
+        Assert.That(implement.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "MAID0002" }));
+        Assert.That(expose.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "MAME0002" }));
+        Assert.That(combined.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EquivalentTo(new[] { "MAID0002", "MAME0002" }));
         AssertSuccessfulGeneration(expose);
     }
 

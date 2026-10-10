@@ -874,7 +874,7 @@ public sealed class ImplementGenerationTests
         AssertSuccessfulGeneration(result);
         Assert.Multiple(() =>
         {
-            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0003"));
+            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0004"));
             Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
             Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("=> _impl.Run();"));
         });

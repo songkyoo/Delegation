@@ -320,7 +320,7 @@ public sealed class ExposeGenerationTests
         AssertSuccessfulGeneration(result);
         Assert.Multiple(() =>
         {
-            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAME0001"));
+            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAME0002"));
             Assert.That(result.GeneratedSources, Has.Length.EqualTo(5));
             Assert.That(
                 result.GeneratedSources.Select(static source => source.SourceText.ToString()),
@@ -355,7 +355,7 @@ public sealed class ExposeGenerationTests
         AssertSuccessfulGeneration(result);
         Assert.Multiple(() =>
         {
-            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAME0001"));
+            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAME0002"));
             Assert.That(result.GeneratedSources, Is.Empty);
         });
     }

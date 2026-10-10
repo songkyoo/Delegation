@@ -89,6 +89,19 @@ internal static class ImplementTargetAnalyzer
         CancellationToken cancellationToken
     )
     {
+        if (PartialTypeValidator.GetNonPartialType(attributeContext.TargetSymbol.ContainingType, cancellationToken)
+            is { } nonPartialType)
+        {
+            return new TargetGenerationOutput(
+                Source: null,
+                Diagnostics: ImmutableArray.Create(Diagnostic.Create(
+                    descriptor: ImplementDiagnostics.ContainingTypeMustBePartialRule,
+                    location: attributeContext.Attributes[0].ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
+                    messageArgs: [nonPartialType.ToDisplayString()]
+                ))
+            );
+        }
+
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         var lines = ImmutableArray.CreateBuilder<string>();
         var implementAttributeSymbol = attributeContext.Attributes.IsEmpty

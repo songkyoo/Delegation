@@ -328,7 +328,7 @@ public class DelegationIncrementalGeneratorTests
         {
             Assert.That(GetSources(firstResult), Has.Length.EqualTo(1));
             Assert.That(GetSources(firstResult)[0].SourceText.ToString(), Does.Contain("_a.Run()"));
-            Assert.That(firstResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0003"), Is.EqualTo(1));
+            Assert.That(firstResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0004"), Is.EqualTo(1));
         });
 
         var oldTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "Wrapper.A.cs");
@@ -348,7 +348,7 @@ public class DelegationIncrementalGeneratorTests
         {
             Assert.That(GetSources(secondResult), Has.Length.EqualTo(1));
             Assert.That(GetSources(secondResult)[0].SourceText.ToString(), Does.Contain("_b.Run()"));
-            Assert.That(secondResult.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0003"));
+            Assert.That(secondResult.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0004"));
         });
     }
 
@@ -412,8 +412,43 @@ public class DelegationIncrementalGeneratorTests
         {
             Assert.That(GetSources(secondResult), Has.Length.EqualTo(1));
             Assert.That(GetSources(secondResult)[0].SourceText.ToString(), Does.Contain("_b.Run()"));
-            Assert.That(secondResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0003"), Is.EqualTo(1));
+            Assert.That(secondResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0004"), Is.EqualTo(1));
         });
+    }
+
+    [Test]
+    public void AddingPartialModifier_ReplacesDiagnosticsWithCompilableSources()
+    {
+        const string source = """
+            using Macaron.InterfaceDelegation;
+            using Macaron.MemberExposure;
+            public interface IRunner { void Run(); }
+            public sealed class Runner : IRunner { public void Run() { } }
+            public sealed class Worker { public int Value => 42; }
+            public class Wrapper
+            {
+                [Implement(typeof(IRunner), Mode = ImplementationMode.Implicit)] private readonly Runner _runner = new();
+                [Expose] private readonly Worker _worker = new();
+            }
+            """;
+        var compilation = CreateCompilation(("Wrapper.cs", source));
+        var driver = CreateTrackedDriver();
+        var firstResult = Run(ref driver, compilation, out var firstCompilation);
+
+        AssertNoCompilationErrors(firstCompilation);
+        Assert.That(firstResult.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EquivalentTo(new[] { "MAID0001", "MAME0001" }));
+        Assert.That(GetSources(firstResult), Is.Empty);
+
+        var originalTree = compilation.SyntaxTrees.Single();
+        var updatedTree = originalTree.WithChangedText(SourceText.From(source.Replace("public class Wrapper", "public partial class Wrapper")));
+        var secondResult = Run(ref driver, compilation.ReplaceSyntaxTree(originalTree, updatedTree), out var secondCompilation);
+
+        AssertNoCompilationErrors(secondCompilation);
+        Assert.That(secondResult.Diagnostics, Is.Empty);
+        Assert.That(GetSources(secondResult), Has.Length.EqualTo(2));
+        Assert.That(GetReasons(secondResult, "ImplementSourceOutput").ToArray(), Is.EqualTo(new[] { IncrementalStepRunReason.Modified }));
+        Assert.That(GetReasons(secondResult, "ExposeSourceOutput").ToArray(), Is.EqualTo(new[] { IncrementalStepRunReason.Modified }));
     }
 
     private static CSharpCompilation CreateCompilation(params (string Path, string Source)[] sources)
