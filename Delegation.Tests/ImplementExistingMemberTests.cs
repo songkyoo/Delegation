@@ -1,8 +1,5 @@
 using static Macaron.Delegation.Tests.Helper;
 
-using Macaron.InterfaceDelegation;
-using Macaron.MemberExposure;
-
 namespace Macaron.Delegation.Tests;
 
 [TestFixture]

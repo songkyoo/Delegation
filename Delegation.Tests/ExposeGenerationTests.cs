@@ -1,8 +1,6 @@
 using Microsoft.CodeAnalysis;
-using static Macaron.Delegation.Tests.Helper;
 
-using Macaron.InterfaceDelegation;
-using Macaron.MemberExposure;
+using static Macaron.Delegation.Tests.Helper;
 
 namespace Macaron.Delegation.Tests;
 

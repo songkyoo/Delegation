@@ -1,9 +1,8 @@
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-
 using Macaron.InterfaceDelegation;
 using Macaron.MemberExposure;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Macaron.Delegation.Tests;
 
