@@ -7,6 +7,62 @@ namespace Macaron.Delegation.Tests;
 [TestFixture]
 public sealed class ImplementGenerationTests
 {
+    [Test]
+    public void InfersSoleImplementedInterface_When_TypeIsOmittedForConcreteField()
+    {
+        const string source =
+            """
+            using Macaron.InterfaceDelegation;
+
+            public interface IRunner { void Run(); }
+
+            public sealed class Runner : IRunner
+            {
+                void IRunner.Run() { }
+            }
+
+            public partial class Wrapper : IRunner
+            {
+                [Implement] private readonly Runner _runner = new();
+            }
+            """;
+
+        var result = RunGenerator(source);
+
+        Assert.That(result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
+        Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("global::IRunner.Run"));
+        AssertSuccessfulGeneration(result);
+    }
+
+    [Test]
+    public void InfersDirectInterface_When_ItInheritsAnotherInterface()
+    {
+        const string source =
+            """
+            using Macaron.InterfaceDelegation;
+
+            public interface IBase { }
+            public interface IDerived : IBase { void Run(); }
+            public sealed class Runner : IDerived
+            {
+                void IDerived.Run() { }
+            }
+
+            public partial class Wrapper : IDerived
+            {
+                [Implement] private readonly Runner _runner = new();
+            }
+            """;
+
+        var result = RunGenerator(source);
+
+        Assert.That(result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
+        Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("global::IDerived.Run"));
+        AssertSuccessfulGeneration(result);
+    }
+
     [TestCase("Implement", "string global::Macaron.Delegation.Tests.IGreeter.Greet")]
     [TestCase("Implement(Mode = ImplementationMode.Explicit)", "string global::Macaron.Delegation.Tests.IGreeter.Greet")]
     [TestCase("Implement(Mode = ImplementationMode.Implicit)", "public string Greet")]

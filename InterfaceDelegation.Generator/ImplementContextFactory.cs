@@ -27,35 +27,31 @@ internal static class ImplementContextFactory
             );
         }
 
-        var interfaceTypeSymbol = GetInterfaceType(attributeData, declaredSymbol);
+        var declaredTypeSymbol = DelegationTargetSymbol.GetDeclaredType(declaredSymbol);
+        var suppliedTypeSymbol = constructorArguments[0].Value;
+        var interfaceTypeSymbol = suppliedTypeSymbol == null
+            ? GetInferredInterfaceType(declaredTypeSymbol)
+            : suppliedTypeSymbol as INamedTypeSymbol;
 
-        if (interfaceTypeSymbol == null)
+        if (interfaceTypeSymbol is not { TypeKind: TypeKind.Interface, IsUnboundGenericType: false })
         {
+            var location = suppliedTypeSymbol == null
+                ? attributeData.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation()
+                : AttributeArgumentReader.GetFirstArgumentLocation(attributeData);
+
             return new GenerationAnalysisResult<ImplementGenerationContext>(
                 Context: null,
                 Diagnostics: ImmutableArray.Create(Diagnostic.Create(
                     descriptor: ImplementDiagnostics.InvalidImplementationTargetRule,
-                    location: AttributeArgumentReader.GetFirstArgumentLocation(attributeData),
-                    messageArgs: [constructorArguments[0].Value]
-                ))
-            );
-        }
-
-        if (interfaceTypeSymbol.TypeKind is not TypeKind.Interface || interfaceTypeSymbol.IsUnboundGenericType)
-        {
-            return new GenerationAnalysisResult<ImplementGenerationContext>(
-                Context: null,
-                Diagnostics: ImmutableArray.Create(Diagnostic.Create(
-                    descriptor: ImplementDiagnostics.InvalidImplementationTargetRule,
-                    location: AttributeArgumentReader.GetFirstArgumentLocation(attributeData),
-                    messageArgs: [interfaceTypeSymbol.ToDisplayString()]
+                    location: location,
+                    messageArgs: [suppliedTypeSymbol ?? declaredTypeSymbol]
                 ))
             );
         }
 
         var contractDiagnostics = CreateContractDiagnostics(
             attributeData,
-            DelegationTargetSymbol.GetDeclaredType(declaredSymbol),
+            declaredTypeSymbol,
             interfaceTypeSymbol,
             declaredSymbol.ContainingType,
             compilation,
@@ -78,13 +74,14 @@ internal static class ImplementContextFactory
         );
     }
 
-    private static INamedTypeSymbol? GetInterfaceType(AttributeData attributeData, ISymbol declaredSymbol)
+    private static INamedTypeSymbol? GetInferredInterfaceType(ITypeSymbol declaredTypeSymbol)
     {
-        var constructorArgument = attributeData.ConstructorArguments[0].Value;
-
-        return constructorArgument == null
-            ? DelegationTargetSymbol.GetDeclaredType(declaredSymbol) as INamedTypeSymbol
-            : constructorArgument as INamedTypeSymbol;
+        return declaredTypeSymbol switch
+        {
+            INamedTypeSymbol { TypeKind: TypeKind.Interface } interfaceType => interfaceType,
+            INamedTypeSymbol { Interfaces.Length: 1 } targetType => targetType.Interfaces[0],
+            _ => null,
+        };
     }
 
     private static ImmutableArray<Diagnostic> CreateContractDiagnostics(

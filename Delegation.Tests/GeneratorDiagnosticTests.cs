@@ -10,7 +10,8 @@ public sealed class GeneratorDiagnosticTests
     [Test]
     public void NonPartialImplementType_ReportsErrorWithoutGeneratingSource()
     {
-        const string source = """
+        const string source =
+            """
             using Macaron.InterfaceDelegation;
             public interface IRunner { void Run(); }
             public sealed class Runner : IRunner { public void Run() { } }
@@ -33,7 +34,8 @@ public sealed class GeneratorDiagnosticTests
     [Test]
     public void NonPartialExposeType_ReportsErrorWithoutGeneratingSource()
     {
-        const string source = """
+        const string source =
+            """
             using Macaron.MemberExposure;
             public sealed class Worker { public void Run() { } }
             public class Wrapper
@@ -55,7 +57,8 @@ public sealed class GeneratorDiagnosticTests
     [Test]
     public void NonPartialOuterType_ReportsBothFeatureErrorsWithoutGeneratingSource()
     {
-        const string source = """
+        const string source =
+            """
             using Macaron.InterfaceDelegation;
             using Macaron.MemberExposure;
             public interface IRunner { void Run(); }
@@ -88,7 +91,8 @@ public sealed class GeneratorDiagnosticTests
     [TestCase("System.Collections.Generic.IEnumerable<>")]
     public void InvalidImplementInterface_ReportsAccurateMessageAndLocation(string typeName)
     {
-        var source = $$"""
+        var source =
+            $$"""
             using Macaron.InterfaceDelegation;
             public partial class Wrapper
             {
@@ -100,8 +104,38 @@ public sealed class GeneratorDiagnosticTests
 
         Assert.That(result.GeneratedSources, Is.Empty);
         Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
-        Assert.That(diagnostic.GetMessage(), Does.Contain("Implement attribute").And.Contain("constructed generic interfaces"));
+        Assert.That(diagnostic.GetMessage(), Does.Contain("Implement attribute")
+            .And.Contain("non-generic or constructed generic interface")
+            .And.Contain("exactly one directly implemented interface"));
         Assert.That(diagnostic.Location.SourceSpan.Start, Is.EqualTo(source.IndexOf("typeof(", StringComparison.Ordinal)));
+    }
+
+    [TestCase("public sealed class Runner { }", "Runner")]
+    [TestCase("public interface IFirst { } public interface ISecond { } public sealed class Runner : IFirst, ISecond { }", "Runner")]
+    [TestCase("public interface IRunner { void Run(); } public class Base : IRunner { public void Run() { } } public sealed class Runner : Base { }", "Runner")]
+    public void OmittedImplementType_ReportsExistingDiagnostic_When_DirectInterfaceCountIsNotOne(
+        string targetDeclaration,
+        string targetTypeName
+    )
+    {
+        var source =
+            $$"""
+            using Macaron.InterfaceDelegation;
+            {{targetDeclaration}}
+            public partial class Wrapper
+            {
+                [Implement] private readonly {{targetTypeName}} _target = new();
+            }
+            """;
+
+        var result = RunGenerator(source);
+        var diagnostic = result.Diagnostics.Single(static diagnostic => diagnostic.Id == "MAID0002");
+
+        Assert.That(result.GeneratedSources, Is.Empty);
+        Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
+        Assert.That(diagnostic.GetMessage(), Does.Contain("exactly one directly implemented interface").And.Contain("Runner"));
+        Assert.That(diagnostic.Location.SourceSpan.Start, Is.EqualTo(source.IndexOf("Implement]", StringComparison.Ordinal)));
+        Assert.That(result.OutputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
     }
 
     [Test]

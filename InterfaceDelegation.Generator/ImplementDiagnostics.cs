@@ -15,8 +15,8 @@ internal static class ImplementDiagnostics
 
     public static readonly DiagnosticDescriptor InvalidImplementationTargetRule = new(
         id: "MAID0002",
-        title: "Implement attribute requires a valid interface type",
-        messageFormat: "'{0}' is not a valid type for the Implement attribute. Only non-generic or constructed generic interfaces are allowed.",
+        title: "Implement attribute cannot determine an interface type",
+        messageFormat: "Cannot determine an interface for the Implement attribute from '{0}'. Specify a non-generic or constructed generic interface, or omit the type only when the target has exactly one directly implemented interface.",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
