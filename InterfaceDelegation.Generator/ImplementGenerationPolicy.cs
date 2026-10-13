@@ -24,15 +24,6 @@ internal static class ImplementGenerationPolicy
             : new InterfaceCastDelegationDispatch(declaredSymbol.Name, context.DelegationTypeSymbol);
     }
 
-    public static bool RequiresInterfaceDispatch(ImplementGenerationContext context)
-    {
-        var targetTypeSymbol = DelegationTargetSymbol.GetDeclaredType(context.DeclaredSymbol);
-
-        return
-            !SymbolEqualityComparer.Default.Equals(targetTypeSymbol, context.DelegationTypeSymbol)
-            && MemberComparisonHelper.ImplementsInterface(targetTypeSymbol, context.DelegationTypeSymbol);
-    }
-
     public static IEnumerable<ISymbol> GetTargetMembers(ImplementGenerationContext context)
     {
         foreach (var symbol in DelegationMemberProvider.GetMembersIncludingBaseTypes(context.DelegationTypeSymbol))
@@ -58,11 +49,21 @@ internal static class ImplementGenerationPolicy
         var decision = mode switch
         {
             Explicit => explicitMember == null ? GenerateExplicitInterfaceImplementation : Skip,
+            Auto => (implicitMember, explicitMember) switch
+            {
+                ({ IsAbstract: true }, null) when !SymbolEqualityComparer.Default.Equals(
+                    implicitMember.ContainingType,
+                    typeSymbol
+                ) => OverrideAbstractMember,
+                (_, null) => GenerateExplicitInterfaceImplementation,
+                _ => Skip,
+            },
             _ => (implicitMember, explicitMember) switch
             {
                 (null, null) => Generate,
                 ({ IsAbstract: true }, null) when !SymbolEqualityComparer.Default.Equals(
-                    implicitMember.ContainingType, typeSymbol
+                    implicitMember.ContainingType,
+                    typeSymbol
                 ) => OverrideAbstractMember,
                 _ => Skip,
             },
@@ -80,7 +81,7 @@ internal static class ImplementGenerationPolicy
                 context.DelegationTypeSymbol
             ),
             OverrideAbstractMember => new OverrideDelegationMemberDeclaration(Accessibility: Public),
-            _ => throw new ArgumentOutOfRangeException(nameof(decision), decision, null),
+            _ => throw new ArgumentOutOfRangeException(paramName: nameof(decision), actualValue: decision, message: null),
         };
 
         return new DelegationMemberGenerationContext(
@@ -88,5 +89,14 @@ internal static class ImplementGenerationPolicy
             SymbolName: symbolName,
             Declaration: declaration
         );
+    }
+
+    private static bool RequiresInterfaceDispatch(ImplementGenerationContext context)
+    {
+        var targetTypeSymbol = DelegationTargetSymbol.GetDeclaredType(context.DeclaredSymbol);
+
+        return
+            !SymbolEqualityComparer.Default.Equals(targetTypeSymbol, context.DelegationTypeSymbol)
+            && MemberComparisonHelper.ImplementsInterface(targetTypeSymbol, context.DelegationTypeSymbol);
     }
 }

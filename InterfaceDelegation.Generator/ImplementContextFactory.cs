@@ -141,11 +141,12 @@ internal static class ImplementContextFactory
 
         if (mode is null)
         {
-            return ImplementationMode.Explicit;
+            return ImplementationMode.Auto;
         }
 
         return (ImplementationMode)mode switch
         {
+            var value and ImplementationMode.Auto => value,
             var value and ImplementationMode.Explicit => value,
             _ => ImplementationMode.Implicit,
         };

@@ -10,5 +10,5 @@ public sealed class ImplementAttribute(Type? interfaceType = null) : Attribute
 {
     public Type? InterfaceType { get; } = interfaceType;
 
-    public ImplementationMode Mode { get; set; } = ImplementationMode.Explicit;
+    public ImplementationMode Mode { get; set; } = ImplementationMode.Auto;
 }

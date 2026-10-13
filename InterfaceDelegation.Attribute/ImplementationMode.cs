@@ -2,6 +2,7 @@
 
 public enum ImplementationMode
 {
+    Auto,
     Implicit,
     Explicit,
 }
