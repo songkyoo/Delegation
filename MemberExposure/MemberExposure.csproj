@@ -29,7 +29,6 @@
     <None Include="..\MemberExposure.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Attribute.dll" Pack="true" PackagePath="lib/netstandard2.0" />
     <None Include="..\MemberExposure.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Attribute.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
     <None Include="..\MemberExposure.Generator\bin\$(Configuration)\netstandard2.0\Macaron.MemberExposure.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
-    <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

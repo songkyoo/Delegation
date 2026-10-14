@@ -29,7 +29,6 @@
     <None Include="..\InterfaceDelegation.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.InterfaceDelegation.Attribute.dll" Pack="true" PackagePath="lib/netstandard2.0" />
     <None Include="..\InterfaceDelegation.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.InterfaceDelegation.Attribute.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
     <None Include="..\InterfaceDelegation.Generator\bin\$(Configuration)\netstandard2.0\Macaron.InterfaceDelegation.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
-    <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>
