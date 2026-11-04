@@ -18,7 +18,11 @@ internal static class ExposeTargetAnalyzer
                 Source: null,
                 Diagnostics: ImmutableArray.Create(Diagnostic.Create(
                     descriptor: ExposeDiagnostics.ContainingTypeMustBePartialRule,
-                    location: attributeContext.Attributes[0].ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation(),
+                    location: attributeContext
+                        .Attributes[0]
+                        .ApplicationSyntaxReference?
+                        .GetSyntax(cancellationToken)
+                        .GetLocation(),
                     messageArgs: [nonPartialType.ToDisplayString()]
                 ))
             );
@@ -39,7 +43,7 @@ internal static class ExposeTargetAnalyzer
                 TargetGenerationComposer.AppendGeneration(
                     lines,
                     generationContext.DelegationTypeSymbol,
-                    ExposeGenerationPipeline.Generate(generationContext)
+                    ExposeGenerationPipeline.Generate(generationContext, attributeContext.SemanticModel.Compilation)
                 );
             }
         }

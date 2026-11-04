@@ -9,7 +9,7 @@ namespace Macaron.MemberExposure;
 
 internal static class ExposeGenerationPolicy
 {
-    public static IEnumerable<ISymbol> GetTargetMembers(ExposeGenerationContext context)
+    public static IEnumerable<ISymbol> GetTargetMembers(ExposeGenerationContext context, Compilation compilation)
     {
         var symbols = !context.PrecomputedTargetMembers.IsDefault
             ? context.PrecomputedTargetMembers
@@ -19,7 +19,9 @@ internal static class ExposeGenerationPolicy
 
         foreach (var symbol in symbols)
         {
-            if (!ShouldIncludeSymbol(context, symbol))
+            if (context.PrecomputedTargetMembers.IsDefault
+                && !IsExposableMember(symbol, context.DeclaredSymbol, context.DelegationTypeSymbol, compilation)
+                || !ShouldIncludeSymbol(context, symbol))
             {
                 continue;
             }
@@ -31,14 +33,18 @@ internal static class ExposeGenerationPolicy
     public static DelegationMemberGenerationContext? CreateMemberGenerationContext(
         ExposeGenerationContext context,
         ISymbol symbol,
-        MemberImplementationIndex implementationIndex
+        MemberImplementationIndex implementationIndex,
+        Compilation compilation
     )
     {
         var typeSymbol = context.DeclaredSymbol.ContainingType;
         var symbolName = context.Rename.TryGetValue(symbol.Name, out var renamed)
             ? renamed
             : symbol.Name;
-        var implicitMember = implementationIndex.FindImplicit(symbol, symbolName, Ignore);
+        var propertyAccessors = symbol is IPropertySymbol property
+            ? GetPropertyAccessors(property, context.DeclaredSymbol, context.DelegationTypeSymbol, compilation)
+            : DelegationPropertyAccessors.None;
+        var implicitMember = implementationIndex.FindImplicit(symbol, symbolName, Ignore, propertyAccessors);
         var decision = implicitMember switch
         {
             null => Generate,
@@ -63,17 +69,65 @@ internal static class ExposeGenerationPolicy
         return new DelegationMemberGenerationContext(
             Symbol: symbol,
             SymbolName: symbolName,
-            Declaration: declaration
+            Declaration: declaration,
+            PropertyAccessors: propertyAccessors
         );
     }
 
-    private static bool ShouldIncludeSymbol(ExposeGenerationContext context, ISymbol symbol)
+    public static bool IsExposableMember(
+        ISymbol symbol,
+        ISymbol declaredSymbol,
+        ITypeSymbol delegationTypeSymbol,
+        Compilation compilation
+    )
     {
-        if (symbol.DeclaredAccessibility is not Public and not Internal)
+        if (symbol.DeclaredAccessibility is not Public and not Internal
+            || !compilation.IsSymbolAccessibleWithin(symbol, declaredSymbol.ContainingType, delegationTypeSymbol))
         {
             return false;
         }
 
+        return symbol switch
+        {
+            IMethodSymbol { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false } => true,
+            IPropertySymbol { IsIndexer: false } property =>
+                GetPropertyAccessors(
+                    property,
+                    declaredSymbol,
+                    delegationTypeSymbol,
+                    compilation
+                ) != DelegationPropertyAccessors.None,
+            IEventSymbol => true,
+            _ => false,
+        };
+    }
+
+    private static DelegationPropertyAccessors GetPropertyAccessors(
+        IPropertySymbol property,
+        ISymbol declaredSymbol,
+        ITypeSymbol delegationTypeSymbol,
+        Compilation compilation
+    )
+    {
+        var accessors = DelegationPropertyAccessors.None;
+
+        if (property.GetMethod is { } getter
+            && compilation.IsSymbolAccessibleWithin(getter, declaredSymbol.ContainingType, delegationTypeSymbol))
+        {
+            accessors |= DelegationPropertyAccessors.Get;
+        }
+
+        if (property.SetMethod is { IsInitOnly: false } setter
+            && compilation.IsSymbolAccessibleWithin(setter, declaredSymbol.ContainingType, delegationTypeSymbol))
+        {
+            accessors |= DelegationPropertyAccessors.Set;
+        }
+
+        return accessors;
+    }
+
+    private static bool ShouldIncludeSymbol(ExposeGenerationContext context, ISymbol symbol)
+    {
         if (!context.Filter.IsEmpty && !context.Filter.Contains(symbol.Name))
         {
             return false;

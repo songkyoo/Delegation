@@ -24,13 +24,17 @@ internal static class ExposeContextFactory
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            builder.Add(Create(attributeData, context.TargetSymbol));
+            builder.Add(Create(attributeData, context.TargetSymbol, context.SemanticModel.Compilation));
         }
 
         return builder.ToImmutable();
     }
 
-    private static GenerationAnalysisResult<ExposeGenerationContext> Create(AttributeData attributeData, ISymbol declaredSymbol)
+    private static GenerationAnalysisResult<ExposeGenerationContext> Create(
+        AttributeData attributeData,
+        ISymbol declaredSymbol,
+        Compilation compilation
+    )
     {
         var constructorArguments = attributeData.ConstructorArguments;
         var includeBaseTypes = attributeData
@@ -49,7 +53,7 @@ internal static class ExposeContextFactory
         var delegationTypeSymbol = DelegationTargetSymbol.GetDeclaredType(declaredSymbol);
         var hasMemberOptions = !filter.IsEmpty || !remove.IsEmpty || !rename.IsEmpty;
         var precomputedTargetMembers = hasMemberOptions
-            ? GetConfigurableMembers(delegationTypeSymbol, includeBaseTypes).ToImmutableArray()
+            ? GetConfigurableMembers(delegationTypeSymbol, includeBaseTypes, declaredSymbol, compilation).ToImmutableArray()
             : default;
 
         return new GenerationAnalysisResult<ExposeGenerationContext>(
@@ -86,7 +90,9 @@ internal static class ExposeContextFactory
 
     private static IEnumerable<ISymbol> GetConfigurableMembers(
         ITypeSymbol delegationTypeSymbol,
-        bool includeBaseTypes
+        bool includeBaseTypes,
+        ISymbol declaredSymbol,
+        Compilation compilation
     )
     {
         var members = includeBaseTypes
@@ -95,18 +101,9 @@ internal static class ExposeContextFactory
 
         foreach (var symbol in members)
         {
-            if (symbol.DeclaredAccessibility is not Accessibility.Public and not Accessibility.Internal)
+            if (ExposeGenerationPolicy.IsExposableMember(symbol, declaredSymbol, delegationTypeSymbol, compilation))
             {
-                continue;
-            }
-
-            switch (symbol)
-            {
-                case IMethodSymbol { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false }:
-                case IPropertySymbol { IsIndexer: false }:
-                case IEventSymbol:
-                    yield return symbol;
-                    break;
+                yield return symbol;
             }
         }
     }

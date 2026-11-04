@@ -59,68 +59,68 @@ internal sealed class MemberImplementationIndex
                     MethodKind: MethodKind.ExplicitInterfaceImplementation,
                     ExplicitInterfaceImplementations: var explicitMethodSymbolsForMember,
                 }:
+                {
+                    foreach (var explicitMethodSymbol in explicitMethodSymbolsForMember)
                     {
-                        foreach (var explicitMethodSymbol in explicitMethodSymbolsForMember)
+                        explicitImplementations?.Add(explicitMethodSymbol);
+
+                        if (symbolComparer.Equals(explicitMethodSymbol.ContainingType, interfaceSymbol))
                         {
-                            explicitImplementations?.Add(explicitMethodSymbol);
-
-                            if (symbolComparer.Equals(explicitMethodSymbol.ContainingType, interfaceSymbol))
-                            {
-                                explicitMethods.Add(explicitMethodSymbol);
-                            }
+                            explicitMethods.Add(explicitMethodSymbol);
                         }
-
-                        break;
                     }
+
+                    break;
+                }
                 case IMethodSymbol { MethodKind: not MethodKind.Constructor } methodSymbol:
+                {
+                    if (methodSymbol.MethodKind == MethodKind.Ordinary)
                     {
-                        if (methodSymbol.MethodKind == MethodKind.Ordinary)
-                        {
-                            implicitMethods.Add(methodSymbol);
-                        }
-
-                        break;
+                        implicitMethods.Add(methodSymbol);
                     }
+
+                    break;
+                }
                 case IPropertySymbol { ExplicitInterfaceImplementations.IsEmpty: false } propertySymbol:
+                {
+                    foreach (var explicitPropertySymbol in propertySymbol.ExplicitInterfaceImplementations)
                     {
-                        foreach (var explicitPropertySymbol in propertySymbol.ExplicitInterfaceImplementations)
+                        explicitImplementations?.Add(explicitPropertySymbol);
+
+                        if (symbolComparer.Equals(explicitPropertySymbol.ContainingType, interfaceSymbol))
                         {
-                            explicitImplementations?.Add(explicitPropertySymbol);
-
-                            if (symbolComparer.Equals(explicitPropertySymbol.ContainingType, interfaceSymbol))
-                            {
-                                explicitProperties.Add(explicitPropertySymbol);
-                            }
+                            explicitProperties.Add(explicitPropertySymbol);
                         }
-
-                        break;
                     }
+
+                    break;
+                }
                 case IPropertySymbol propertySymbol:
-                    {
-                        implicitProperties.Add(propertySymbol);
+                {
+                    implicitProperties.Add(propertySymbol);
 
-                        break;
-                    }
+                    break;
+                }
                 case IEventSymbol { ExplicitInterfaceImplementations.IsEmpty: false } eventSymbol:
+                {
+                    foreach (var explicitEventSymbol in eventSymbol.ExplicitInterfaceImplementations)
                     {
-                        foreach (var explicitEventSymbol in eventSymbol.ExplicitInterfaceImplementations)
+                        explicitImplementations?.Add(explicitEventSymbol);
+
+                        if (symbolComparer.Equals(explicitEventSymbol.ContainingType, interfaceSymbol))
                         {
-                            explicitImplementations?.Add(explicitEventSymbol);
-
-                            if (symbolComparer.Equals(explicitEventSymbol.ContainingType, interfaceSymbol))
-                            {
-                                explicitEvents.Add(explicitEventSymbol);
-                            }
+                            explicitEvents.Add(explicitEventSymbol);
                         }
-
-                        break;
                     }
+
+                    break;
+                }
                 case IEventSymbol eventSymbol:
-                    {
-                        implicitEvents.Add(eventSymbol);
+                {
+                    implicitEvents.Add(eventSymbol);
 
-                        break;
-                    }
+                    break;
+                }
             }
         }
 
@@ -141,10 +141,11 @@ internal sealed class MemberImplementationIndex
     public ISymbol? FindImplicit(
         ISymbol symbol,
         string symbolName,
-        MethodReturnTypeComparison returnTypeComparison
+        MethodReturnTypeComparison returnTypeComparison,
+        DelegationPropertyAccessors propertyAccessors = DelegationPropertyAccessors.All
     )
     {
-        return Find(symbol, symbolName, returnTypeComparison, _implicitMembers);
+        return Find(symbol, symbolName, returnTypeComparison, _implicitMembers, propertyAccessors);
     }
 
     public ISymbol? FindExplicit(
@@ -166,49 +167,58 @@ internal sealed class MemberImplementationIndex
         ISymbol symbol,
         string symbolName,
         MethodReturnTypeComparison returnTypeComparison,
-        MemberLookups lookups
+        MemberLookups lookups,
+        DelegationPropertyAccessors propertyAccessors = DelegationPropertyAccessors.All
     )
     {
         switch (symbol)
         {
             case IMethodSymbol methodSymbol:
+            {
+                if (lookups.Methods.TryGetValue(GetLookupKey(methodSymbol, symbolName), out var methods))
                 {
-                    if (lookups.Methods.TryGetValue(GetLookupKey(methodSymbol, symbolName), out var methods))
+                    return methods.FirstOrDefault(candidate =>
                     {
-                        return methods.FirstOrDefault(candidate =>
-                            MemberComparisonHelper.MatchesMethodSignature(
-                                methodSymbol,
-                                symbolName,
-                                candidate,
-                                returnTypeComparison
-                            )
+                        return MemberComparisonHelper.MatchesMethodSignature(
+                            methodSymbol,
+                            symbolName,
+                            candidate,
+                            returnTypeComparison
                         );
-                    }
-
-                    break;
+                    });
                 }
+
+                break;
+            }
             case IPropertySymbol propertySymbol:
+            {
+                if (lookups.Properties.TryGetValue(GetLookupKey(propertySymbol, symbolName), out var properties))
                 {
-                    if (lookups.Properties.TryGetValue(GetLookupKey(propertySymbol, symbolName), out var properties))
+                    return properties.FirstOrDefault(candidate =>
                     {
-                        return properties.FirstOrDefault(candidate =>
-                            MemberComparisonHelper.MatchesPropertySignature(propertySymbol, symbolName, candidate)
+                        return MemberComparisonHelper.MatchesPropertySignature(
+                            propertySymbol,
+                            symbolName,
+                            candidate,
+                            propertyAccessors
                         );
-                    }
-
-                    break;
+                    });
                 }
+
+                break;
+            }
             case IEventSymbol eventSymbol:
+            {
+                if (lookups.Events.TryGetValue(GetLookupKey(eventSymbol, symbolName), out var events))
                 {
-                    if (lookups.Events.TryGetValue(GetLookupKey(eventSymbol, symbolName), out var events))
+                    return events.FirstOrDefault(candidate =>
                     {
-                        return events.FirstOrDefault(candidate =>
-                            MemberComparisonHelper.MatchesEventSignature(eventSymbol, symbolName, candidate)
-                        );
-                    }
-
-                    break;
+                        return MemberComparisonHelper.MatchesEventSignature(eventSymbol, symbolName, candidate);
+                    });
                 }
+
+                break;
+            }
         }
 
         return null;
@@ -235,6 +245,7 @@ internal sealed class MemberImplementationIndex
     private static PropertyLookupKey GetLookupKey(IPropertySymbol propertySymbol, string propertyName)
     {
         var signatureHash = SymbolEqualityComparer.Default.GetHashCode(propertySymbol.Type);
+
         foreach (var parameterSymbol in propertySymbol.Parameters)
         {
             signatureHash = CombineHash(signatureHash, SymbolEqualityComparer.Default.GetHashCode(parameterSymbol.Type));

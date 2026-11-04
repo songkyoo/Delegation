@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 using static Macaron.Delegation.Tests.Helper;
 
@@ -7,6 +8,244 @@ namespace Macaron.Delegation.Tests;
 [TestFixture]
 public sealed class ExposeGenerationTests
 {
+    [TestCase("get => 0;", "get; private set;")]
+    [TestCase("set { }", "private get; set;")]
+    public void ChecksExistingPropertiesUsingOnlyExposedAccessors(string existingAccessors, string targetAccessors)
+    {
+        var result = RunGenerator(
+            $$"""
+            using Macaron.MemberExposure;
+
+            public class Target { public int Value { {{targetAccessors}} } }
+
+            public partial class Wrapper
+            {
+                public int Renamed { {{existingAccessors}} }
+
+                [Expose(rename: new[] { "Value:Renamed" })]
+                private readonly Target _target = new();
+            }
+            """
+        );
+
+        AssertSuccessfulGeneration(result);
+        Assert.That(result.GeneratedSources, Is.Empty);
+    }
+
+    [Test]
+    public void PreservesPrivateAccessors_WhenAccessibleFromNestedWrapper()
+    {
+        var result = RunGenerator(
+            """
+            using Macaron.MemberExposure;
+
+            public partial class Target
+            {
+                public int Value { get; private set; }
+                public partial class Wrapper
+                {
+                    [Expose]
+                    private readonly Target _target = new();
+                }
+            }
+            """
+        );
+
+        AssertSuccessfulGeneration(result);
+        Assert.That(
+            result.GeneratedSources.Single().SourceText.ToString(),
+            Does.Contain("get => _target.Value;").And.Contain("set => _target.Value = value;")
+        );
+    }
+
+    [TestCase("Target", false)]
+    [TestCase("Wrapper", true)]
+    public void ChecksProtectedAccessorThroughReceiverType(string receiverType, bool canSet)
+    {
+        var result = RunGenerator(
+            $$"""
+            using Macaron.MemberExposure;
+
+            public class Target { public int Value { get; protected set; } }
+
+            public partial class Wrapper : Target
+            {
+                [Expose(rename: new[] { "Value:DelegatedValue" }, IncludeBaseTypes = true)]
+                private readonly {{receiverType}} _target = null!;
+            }
+            """
+        );
+
+        AssertSuccessfulGeneration(result);
+
+        var source = result.GeneratedSources.Single().SourceText.ToString();
+
+        Assert.That(source.Contains("set => _target.Value = value;", StringComparison.Ordinal), Is.EqualTo(canSet));
+    }
+
+    [TestCase("private", false)]
+    [TestCase("protected", false)]
+    [TestCase("private protected", false)]
+    [TestCase("internal", true)]
+    [TestCase("protected internal", true)]
+    public void ExposesOnlyAccessiblePropertyAccessors(string accessibility, bool accessible)
+    {
+        var result = RunGenerator(
+            $$"""
+            using Macaron.MemberExposure;
+
+            public class Target
+            {
+                public int Readable { get; {{accessibility}} set; }
+                public int Writable { {{accessibility}} get; set; }
+            }
+
+            public partial class Wrapper
+            {
+                [Expose]
+                private readonly Target _target = new();
+            }
+            """
+        );
+
+        AssertSuccessfulGeneration(result);
+
+        var source = result.GeneratedSources.Single().SourceText.ToString();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(source, Does.Contain("get => _target.Readable;"));
+            Assert.That(source, Does.Contain("set => _target.Writable = value;"));
+            Assert.That(
+                source.Contains("set => _target.Readable = value;", StringComparison.Ordinal),
+                Is.EqualTo(accessible)
+            );
+            Assert.That(
+                source.Contains("get => _target.Writable;", StringComparison.Ordinal),
+                Is.EqualTo(accessible)
+            );
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SkipsPropertiesWithoutCallableAccessors(bool useOptions)
+    {
+        var result = RunGenerator(
+            $$"""
+            using Macaron.MemberExposure;
+
+            public class Target
+            {
+                public int Value { private get; init; }
+                public int InitOnly { init { } }
+                public int Readable { get; init; }
+            }
+
+            public partial class Wrapper
+            {
+                [Expose{{(useOptions ? "(filter: new[] { \"Value\", \"InitOnly\", \"Readable\" })" : "")}}]
+                private readonly Target _target = new();
+            }
+            """
+        );
+
+        AssertSuccessfulGeneration(result);
+
+        var source = result.GeneratedSources.Single().SourceText.ToString();
+
+        Assert.That(
+            source,
+            Does.Contain("get => _target.Readable;").And.Not.Contain("int Value").And.Not.Contain("int InitOnly")
+        );
+        Assert.That(
+            result.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAME0002"),
+            Is.EqualTo(useOptions ? 2 : 0)
+        );
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void ChecksAccessibilityAcrossAssemblies_ForDeclaredAndInheritedMembers(bool useOptions, bool friendAssembly)
+    {
+        const string targetSource =
+            """
+            public class TargetBase
+            {
+                internal void HiddenMethod() { }
+
+                internal int HiddenProperty { get; set; }
+
+                internal event System.Action HiddenEvent { add { } remove { } }
+
+                public int Readable { get; internal set; }
+
+                public int Writable { internal get; set; }
+            }
+
+            public class Target : TargetBase
+            {
+                internal void HiddenDeclaredMethod() { }
+
+                internal int HiddenDeclaredProperty { get; set; }
+
+                internal event System.Action HiddenDeclaredEvent { add { } remove { } }
+
+                public void Run() { }
+
+                public event System.Action Changed { add { } remove { } }
+            }
+            """;
+        var references = CreateReferences(typeof(MemberExposure.ExposeAttribute));
+        var targetCompilation = CSharpCompilation.Create(
+            "ExternalTargets",
+            [
+                CSharpSyntaxTree.ParseText((friendAssembly
+                    ? "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"Macaron.Delegation.Tests\")]\n"
+                    : "") + targetSource)
+            ],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+        );
+        Assert.That(targetCompilation.GetDiagnostics(), Is.Empty);
+
+        var result = RunGeneratorWithReferences(
+            $$"""
+            using Macaron.MemberExposure;
+            public partial class Wrapper
+            {
+                [Expose({{(useOptions ? "filter: new[] { \"Run\", \"Changed\", \"Readable\", \"Writable\" }, " : "")}}IncludeBaseTypes = true)]
+                private readonly Target _target = new();
+            }
+            """,
+            references.Add(targetCompilation.ToMetadataReference())
+        );
+
+        AssertSuccessfulGeneration(result);
+
+        var source = result.GeneratedSources.Single().SourceText.ToString();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(source.Contains("Hidden", StringComparison.Ordinal), Is.EqualTo(friendAssembly && !useOptions));
+            Assert.That(source, Does.Contain("void Run()").And.Contain("event global::System.Action Changed"));
+            Assert.That(
+                source,
+                Does.Contain("get => _target.Readable;").And.Contain("set => _target.Writable = value;")
+            );
+            Assert.That(
+                source.Contains("set => _target.Readable", StringComparison.Ordinal),
+                Is.EqualTo(friendAssembly)
+            );
+            Assert.That(
+                source.Contains("get => _target.Writable", StringComparison.Ordinal),
+                Is.EqualTo(friendAssembly)
+            );
+        });
+    }
+
     [Test]
     public void IgnoresNonExposeableMembers_When_UsingExposeAttribute()
     {

@@ -16,11 +16,78 @@ public class DelegationIncrementalGeneratorTests
     );
 
     [Test]
+    public void ChangingAccessorAccessibility_UpdatesExposeOutputAndPreservesUnrelatedCache()
+    {
+        const string target = "public class Target { public int Value { get; private set; } }";
+        const string wrapper =
+            """
+            using Macaron.MemberExposure;
+
+            public partial class Wrapper
+            {
+                [Expose(filter: new[] { "Value" })] private readonly Target _target = new();
+            }
+            """;
+        const string other =
+            """
+            using Macaron.MemberExposure;
+
+            public class OtherTarget { public int Answer => 42; }
+
+            public partial class OtherWrapper
+            {
+                [Expose] private readonly OtherTarget _target = new();
+            }
+            """;
+        var compilation = CreateCompilation(("Target.cs", target), ("Wrapper.cs", wrapper), ("Other.cs", other));
+        var driver = CreateTrackedDriver();
+        var original = Run(ref driver, compilation, out var originalCompilation);
+
+        AssertNoCompilationErrors(originalCompilation);
+        Assert.That(
+            GetSources(original)
+                .Select(static source => source.SourceText.ToString())
+                .Single(source => source.Contains("partial class Wrapper", StringComparison.Ordinal)),
+            Does.Not.Contain("set => _target.Value")
+        );
+
+        var tree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "Target.cs");
+        var result = Run(
+            ref driver,
+            compilation.ReplaceSyntaxTree(
+                tree,
+                tree.WithChangedText(SourceText.From(target.Replace("private set", "set")))
+            ),
+            out var outputCompilation
+        );
+
+        AssertNoCompilationErrors(outputCompilation);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Diagnostics, Is.Empty);
+            Assert.That(
+                GetSources(result)
+                    .Select(static source => source.SourceText.ToString())
+                    .Single(source => source.Contains("partial class Wrapper", StringComparison.Ordinal)),
+                Does.Contain("set => _target.Value = value;")
+            );
+            Assert.That(GetReasons(result, "ExposeSourceOutput"), Is.EquivalentTo(new[]
+            {
+                IncrementalStepRunReason.Modified,
+                IncrementalStepRunReason.Cached,
+            }));
+        });
+    }
+
+    [Test]
     public void RecognizesAliasedMemberExposureAttribute()
     {
-        const string source = """
+        const string source =
+            """
             using ExposeAlias = Macaron.MemberExposure.ExposeAttribute;
+
             public sealed class Target { public int Value => 42; }
+
             public partial class Wrapper
             {
                 [ExposeAlias(filter: new[] { "Value" })] private Target _target = new();
@@ -45,15 +112,19 @@ public class DelegationIncrementalGeneratorTests
         string cachedTrackingName
     )
     {
-        const string source = """
+        const string source =
+            """
             using Macaron.InterfaceDelegation;
             using Macaron.MemberExposure;
+
             public interface IRunner { void Run(); }
+
             public sealed class Target : IRunner
             {
                 public void Run() { }
                 public int Value => 42;
             }
+
             public partial class Wrapper : IRunner
             {
                 [Implement(typeof(IRunner))] private Target _implement = new();
@@ -63,7 +134,9 @@ public class DelegationIncrementalGeneratorTests
         var compilation = CreateCompilation(("Wrapper.cs", source));
         var driver = CreateTrackedDriver();
         var original = Run(ref driver, compilation, out var originalCompilation);
+
         AssertNoCompilationErrors(originalCompilation);
+
         var oldTree = compilation.SyntaxTrees.Single();
         var newTree = oldTree.WithChangedText(SourceText.From(source.Replace(fieldName, fieldName + "Changed")));
         var result = Run(ref driver, compilation.ReplaceSyntaxTree(oldTree, newTree), out var outputCompilation);
@@ -72,11 +145,18 @@ public class DelegationIncrementalGeneratorTests
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(GetReasons(result, changedTrackingName), Is.EqualTo(new[] { IncrementalStepRunReason.Modified }));
         Assert.That(GetReasons(result, cachedTrackingName), Is.EqualTo(new[] { IncrementalStepRunReason.Cached }));
+
         var originalCached = original.Results.Single(result => result.TrackedSteps.ContainsKey(cachedTrackingName));
         var currentCached = result.Results.Single(result => result.TrackedSteps.ContainsKey(cachedTrackingName));
-        Assert.That(currentCached.GeneratedSources.Single().HintName, Is.EqualTo(originalCached.GeneratedSources.Single().HintName));
-        Assert.That(currentCached.GeneratedSources.Single().SourceText.ToString(),
-            Is.EqualTo(originalCached.GeneratedSources.Single().SourceText.ToString()));
+
+        Assert.That(
+            currentCached.GeneratedSources.Single().HintName,
+            Is.EqualTo(originalCached.GeneratedSources.Single().HintName)
+        );
+        Assert.That(
+            currentCached.GeneratedSources.Single().SourceText.ToString(),
+            Is.EqualTo(originalCached.GeneratedSources.Single().SourceText.ToString())
+        );
     }
 
     [Test]
@@ -88,7 +168,9 @@ public class DelegationIncrementalGeneratorTests
             using Macaron.MemberExposure;
 
             public interface IA { void RunA(); }
+
             public sealed class AImpl : IA { public void RunA() { } }
+
             public partial class A : IA
             {
                 [Implement(typeof(IA))]
@@ -101,7 +183,9 @@ public class DelegationIncrementalGeneratorTests
             using Macaron.MemberExposure;
 
             public interface IB { void RunB(); }
+
             public sealed class BImpl : IB { public void RunB() { } }
+
             public partial class B : IB
             {
                 [Implement(typeof(IB))]
@@ -110,6 +194,7 @@ public class DelegationIncrementalGeneratorTests
             """;
         var compilation = CreateCompilation(("A.cs", sourceA), ("B.cs", sourceB));
         var driver = CreateTrackedDriver();
+
         _ = Run(ref driver, compilation, out _);
 
         var oldTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "A.cs");
@@ -154,6 +239,7 @@ public class DelegationIncrementalGeneratorTests
             using Macaron.MemberExposure;
 
             public sealed class ATarget { public void RunA() { } }
+
             public partial class A
             {
                 [Expose]
@@ -166,6 +252,7 @@ public class DelegationIncrementalGeneratorTests
             using Macaron.MemberExposure;
 
             public sealed class BTarget { public void RunB() { } }
+
             public partial class B
             {
                 [Expose]
@@ -174,6 +261,7 @@ public class DelegationIncrementalGeneratorTests
             """;
         var compilation = CreateCompilation(("A.cs", sourceA), ("B.cs", sourceB));
         var driver = CreateTrackedDriver();
+
         _ = Run(ref driver, compilation, out _);
 
         var oldTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "A.cs");
@@ -262,7 +350,9 @@ public class DelegationIncrementalGeneratorTests
             using ImplementAlias = Macaron.InterfaceDelegation.ImplementAttribute;
 
             public interface IFoo { void Run(); }
+
             public sealed class Foo : IFoo { public void Run() { } }
+
             public partial class Wrapper : IFoo
             {
                 [ImplementAlias(typeof(IFoo))]
@@ -289,6 +379,7 @@ public class DelegationIncrementalGeneratorTests
             namespace Example;
 
             public interface IFoo { void Run(); }
+
             public sealed class Foo : IFoo { public void Run() { } }
             """;
         const string partA =
@@ -323,6 +414,7 @@ public class DelegationIncrementalGeneratorTests
         var driver = CreateTrackedDriver();
 
         var firstResult = Run(ref driver, compilation, out _);
+
         Assert.Multiple(() =>
         {
             Assert.That(GetSources(firstResult), Has.Length.EqualTo(1));
@@ -347,7 +439,10 @@ public class DelegationIncrementalGeneratorTests
         {
             Assert.That(GetSources(secondResult), Has.Length.EqualTo(1));
             Assert.That(GetSources(secondResult)[0].SourceText.ToString(), Does.Contain("_b.Run()"));
-            Assert.That(secondResult.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0004"));
+            Assert.That(
+                secondResult.Diagnostics,
+                Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0004")
+            );
         });
     }
 
@@ -362,6 +457,7 @@ public class DelegationIncrementalGeneratorTests
             namespace Example;
 
             public interface IFoo { void Run(); }
+
             public sealed class Foo : IFoo { public void Run() { } }
             """;
         const string partA =
@@ -396,6 +492,7 @@ public class DelegationIncrementalGeneratorTests
         var driver = CreateTrackedDriver();
 
         var firstResult = Run(ref driver, compilation, out _);
+
         Assert.That(GetSources(firstResult).Single().SourceText.ToString(), Does.Contain("_a.Run()"));
 
         var reorderedCompilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(
@@ -403,7 +500,6 @@ public class DelegationIncrementalGeneratorTests
             compilation.SyntaxTrees.Single(static tree => tree.FilePath == "Wrapper.B.cs"),
             compilation.SyntaxTrees.Single(static tree => tree.FilePath == "Wrapper.A.cs")
         );
-
         var secondResult = Run(ref driver, reorderedCompilation, out var outputCompilation);
 
         AssertNoCompilationErrors(outputCompilation);
@@ -411,7 +507,10 @@ public class DelegationIncrementalGeneratorTests
         {
             Assert.That(GetSources(secondResult), Has.Length.EqualTo(1));
             Assert.That(GetSources(secondResult)[0].SourceText.ToString(), Does.Contain("_b.Run()"));
-            Assert.That(secondResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0004"), Is.EqualTo(1));
+            Assert.That(
+                secondResult.Diagnostics.Count(static diagnostic => diagnostic.Id == "MAID0004"),
+                Is.EqualTo(1)
+            );
         });
     }
 
@@ -421,9 +520,13 @@ public class DelegationIncrementalGeneratorTests
         const string source = """
             using Macaron.InterfaceDelegation;
             using Macaron.MemberExposure;
+
             public interface IRunner { void Run(); }
+
             public sealed class Runner : IRunner { public void Run() { } }
+
             public sealed class Worker { public int Value => 42; }
+
             public class Wrapper
             {
                 [Implement(typeof(IRunner), Mode = ImplementationMode.Implicit)] private readonly Runner _runner = new();
@@ -435,19 +538,33 @@ public class DelegationIncrementalGeneratorTests
         var firstResult = Run(ref driver, compilation, out var firstCompilation);
 
         AssertNoCompilationErrors(firstCompilation);
-        Assert.That(firstResult.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EquivalentTo(new[] { "MAID0001", "MAME0001" }));
+        Assert.That(
+            firstResult.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EquivalentTo(new[] { "MAID0001", "MAME0001" })
+        );
         Assert.That(GetSources(firstResult), Is.Empty);
 
         var originalTree = compilation.SyntaxTrees.Single();
-        var updatedTree = originalTree.WithChangedText(SourceText.From(source.Replace("public class Wrapper", "public partial class Wrapper")));
-        var secondResult = Run(ref driver, compilation.ReplaceSyntaxTree(originalTree, updatedTree), out var secondCompilation);
+        var updatedTree = originalTree.WithChangedText(
+            SourceText.From(source.Replace("public class Wrapper", "public partial class Wrapper"))
+        );
+        var secondResult = Run(
+            ref driver,
+            compilation.ReplaceSyntaxTree(originalTree, updatedTree),
+            out var secondCompilation
+        );
 
         AssertNoCompilationErrors(secondCompilation);
         Assert.That(secondResult.Diagnostics, Is.Empty);
         Assert.That(GetSources(secondResult), Has.Length.EqualTo(2));
-        Assert.That(GetReasons(secondResult, "ImplementSourceOutput").ToArray(), Is.EqualTo(new[] { IncrementalStepRunReason.Modified }));
-        Assert.That(GetReasons(secondResult, "ExposeSourceOutput").ToArray(), Is.EqualTo(new[] { IncrementalStepRunReason.Modified }));
+        Assert.That(
+            GetReasons(secondResult, "ImplementSourceOutput").ToArray(),
+            Is.EqualTo(new[] { IncrementalStepRunReason.Modified })
+        );
+        Assert.That(
+            GetReasons(secondResult, "ExposeSourceOutput").ToArray(),
+            Is.EqualTo(new[] { IncrementalStepRunReason.Modified })
+        );
     }
 
     private static CSharpCompilation CreateCompilation(params (string Path, string Source)[] sources)
@@ -515,7 +632,7 @@ public class DelegationIncrementalGeneratorTests
 
     private static ImmutableArray<GeneratedSourceResult> GetSources(GeneratorDriverRunResult result)
     {
-        return [..result.Results.SelectMany(static result => result.GeneratedSources)];
+        return [.. result.Results.SelectMany(static result => result.GeneratedSources)];
     }
 
     private static void AssertNoCompilationErrors(Compilation compilation)
@@ -523,6 +640,10 @@ public class DelegationIncrementalGeneratorTests
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
-        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())));
+        Assert.That(
+            errors,
+            Is.Empty,
+            string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString()))
+        );
     }
 }

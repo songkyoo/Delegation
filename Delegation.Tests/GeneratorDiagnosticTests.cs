@@ -365,4 +365,36 @@ public sealed class GeneratorDiagnosticTests
             Assert.That(generatedCode, Is.Empty);
         });
     }
+
+    [TestCase("int Value { get; set; }", "public int Value { get; private set; }")]
+    [TestCase("int Value { get; set; }", "public int Value { private get; set; }")]
+    [TestCase("int this[int index] { get; set; }", "public int this[int index] { get => 0; private set { } }")]
+    public void RejectsInaccessibleDuckTypedAccessors(string contract, string implementation)
+    {
+        var result = RunGenerator(
+            $$"""
+            using Macaron.InterfaceDelegation;
+
+            public interface ITarget { {{contract}} }
+
+            public class Target { {{implementation}} }
+
+            public partial class Wrapper
+            {
+                [Implement(typeof(ITarget), Mode = ImplementationMode.Implicit)]
+                private readonly Target _target = new();
+            }
+            """
+        );
+
+        AssertSuccessfulGeneration(result);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                result.Diagnostics,
+                Has.Exactly(1).Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0005")
+            );
+            Assert.That(result.GeneratedSources, Is.Empty);
+        });
+    }
 }

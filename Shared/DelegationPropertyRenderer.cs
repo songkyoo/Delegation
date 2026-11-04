@@ -31,12 +31,13 @@ internal static class DelegationPropertyRenderer
         builder.Add($"{context.AccessibilityText}{context.OverrideModifier}{propertyType} {context.ExplicitInterfacePrefix}{context.MemberContext.SymbolName}");
         builder.Add("{");
 
-        if (propertySymbol.GetMethod != null)
+        if (propertySymbol.GetMethod != null && context.MemberContext.PropertyAccessors.HasFlag(DelegationPropertyAccessors.Get))
         {
             context.DispatchRenderer.RenderPropertyGetter(propertyType, propertySymbol.Name, builder);
         }
 
-        if (propertySymbol.SetMethod != null && !propertySymbol.SetMethod.IsInitOnly)
+        if (propertySymbol.SetMethod != null && !propertySymbol.SetMethod.IsInitOnly
+            && context.MemberContext.PropertyAccessors.HasFlag(DelegationPropertyAccessors.Set))
         {
             context.DispatchRenderer.RenderPropertySetter(propertyType, propertySymbol.Name, builder);
         }

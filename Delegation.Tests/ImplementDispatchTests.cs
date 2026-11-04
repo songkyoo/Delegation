@@ -7,13 +7,39 @@ namespace Macaron.Delegation.Tests;
 [TestFixture]
 public sealed class ImplementDispatchTests
 {
+    [TestCase("int Value { get; }", "public int Value { get; private set; }")]
+    [TestCase("int Value { set; }", "public int Value { private get; set; }")]
+    public void RequiresAccessibilityOnlyForContractAccessors(string contract, string implementation)
+    {
+        var result = RunGenerator(
+            $$"""
+            using Macaron.InterfaceDelegation;
+
+            public interface ITarget { {{contract}} }
+
+            public class Target { {{implementation}} }
+
+            public partial class Wrapper : ITarget
+            {
+                [Implement(typeof(ITarget))]
+                private readonly Target _target = new();
+            }
+            """
+        );
+
+        AssertSuccessfulGeneration(result);
+        Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0005"));
+        Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
+    }
+
     [Test]
     public void UsesNominalContractFastPath_ForDefaultInterfaceImplementation()
     {
         const string sourceCode =
             """
-            namespace Macaron.Delegation.Tests;
             using Macaron.InterfaceDelegation;
+
+            namespace Macaron.Delegation.Tests;
 
             public interface IFoo
             {

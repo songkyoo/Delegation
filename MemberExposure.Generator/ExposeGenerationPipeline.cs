@@ -1,11 +1,12 @@
 using Macaron.Delegation;
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 
 namespace Macaron.MemberExposure;
 
 internal static class ExposeGenerationPipeline
 {
-    public static ImmutableArray<string> Generate(ExposeGenerationContext context)
+    public static ImmutableArray<string> Generate(ExposeGenerationContext context, Compilation compilation)
     {
         var executionContext = DelegationGenerationContext.Create(
             context.DeclaredSymbol,
@@ -15,12 +16,13 @@ internal static class ExposeGenerationPipeline
         var dispatchRenderer = DelegationDispatchRenderer.Create(executionContext.Dispatch);
         var builder = ImmutableArray.CreateBuilder<string>();
 
-        foreach (var symbol in ExposeGenerationPolicy.GetTargetMembers(context))
+        foreach (var symbol in ExposeGenerationPolicy.GetTargetMembers(context, compilation))
         {
             var memberContext = ExposeGenerationPolicy.CreateMemberGenerationContext(
                 context,
                 symbol,
-                executionContext.ImplementationIndex
+                executionContext.ImplementationIndex,
+                compilation
             );
 
             if (memberContext == null)

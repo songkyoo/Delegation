@@ -5,5 +5,6 @@ namespace Macaron.Delegation;
 internal readonly record struct DelegationMemberGenerationContext(
     ISymbol Symbol,
     string SymbolName,
-    DelegationMemberDeclaration Declaration
+    DelegationMemberDeclaration Declaration,
+    DelegationPropertyAccessors PropertyAccessors = DelegationPropertyAccessors.All
 );

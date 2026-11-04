@@ -37,7 +37,7 @@ internal static class MemberComparisonHelper
             explicitImplementations
         );
 
-        return new CompatibleImplementationChecker(implementationIndex, explicitImplementations);
+        return new CompatibleImplementationChecker(implementationIndex, explicitImplementations, isAccessible);
     }
 
     internal static MemberImplementationIndex CreateImplementationIndex(
@@ -106,7 +106,8 @@ internal static class MemberComparisonHelper
     internal static bool MatchesPropertySignature(
         IPropertySymbol propertySymbol,
         string propertyName,
-        IPropertySymbol targetPropertySymbol
+        IPropertySymbol targetPropertySymbol,
+        DelegationPropertyAccessors propertyAccessors = DelegationPropertyAccessors.All
     )
     {
         var comparer = SymbolEqualityComparer.Default;
@@ -132,12 +133,17 @@ internal static class MemberComparisonHelper
             }
         }
 
-        if (propertySymbol.GetMethod != null && targetPropertySymbol.GetMethod == null)
+        if (propertyAccessors.HasFlag(DelegationPropertyAccessors.Get)
+            && propertySymbol.GetMethod != null
+            && targetPropertySymbol.GetMethod == null
+        )
         {
             return false;
         }
 
-        return propertySymbol.SetMethod == null || targetPropertySymbol.SetMethod != null;
+        return !propertyAccessors.HasFlag(DelegationPropertyAccessors.Set)
+            || propertySymbol.SetMethod == null
+            || targetPropertySymbol.SetMethod != null;
     }
 
     internal static bool MatchesEventSignature(
