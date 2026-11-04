@@ -9,23 +9,39 @@ namespace Macaron.Delegation.Tests;
 [TestFixture]
 public sealed class GeneratorIsolationTests
 {
-    private const string Source = """
+    private const string Source =
+        """
         using Macaron.InterfaceDelegation;
         using Macaron.MemberExposure;
 
-        public interface IRunner { void Run(); }
+        public interface IRunner
+        {
+            void Run();
+        }
+
         public sealed class Target : IRunner
         {
             public void Run() { }
+
             public int Value => 42;
         }
+
         public partial class Wrapper
         {
             [Implement(typeof(IRunner), Mode = ImplementationMode.Implicit)]
             [Expose(filter: new[] { "Value" })]
             private Target _target = new();
         }
+
         """;
+
+    public static IEnumerable<TestCaseData> GeneratorOrders =>
+    [
+        new TestCaseData((object)new IIncrementalGenerator[] { new ImplementGenerator(), new ExposeGenerator() })
+            .SetName("CombinedGenerators_PreserveSources_WhenImplementRunsFirst"),
+        new TestCaseData((object)new IIncrementalGenerator[] { new ExposeGenerator(), new ImplementGenerator() })
+            .SetName("CombinedGenerators_PreserveSources_WhenExposeRunsFirst"),
+    ];
 
     [Test]
     public void ImplementAlone_ProducesOnlyInterfaceMembers()
@@ -35,7 +51,10 @@ public sealed class GeneratorIsolationTests
         AssertSuccessfulGeneration(result);
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
-        Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("void Run()").And.Not.Contain("int Value"));
+        Assert.That(
+            result.GeneratedSources[0].SourceText.ToString(),
+            Does.Contain("void Run()").And.Not.Contain("int Value")
+        );
     }
 
     [Test]
@@ -46,30 +65,38 @@ public sealed class GeneratorIsolationTests
         AssertSuccessfulGeneration(result);
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
-        Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("int Value").And.Not.Contain("void Run()"));
+        Assert.That(
+            result.GeneratedSources[0].SourceText.ToString(),
+            Does.Contain("int Value").And.Not.Contain("void Run()")
+        );
     }
 
-    [Test]
-    public void CombinedGenerators_PreserveStandaloneSourcesAndHintNames_InEitherOrder()
+    [TestCaseSource(nameof(GeneratorOrders))]
+    public void CombinedGenerators_PreserveStandaloneSourcesAndHintNames(IIncrementalGenerator[] generators)
     {
         var implement = RunGenerator(Source, new ImplementGenerator());
         var expose = RunGenerator(Source, new ExposeGenerator());
-        var expected = implement.GeneratedSources.Concat(expose.GeneratedSources)
-            .Select(static source => (source.HintName, Source: source.SourceText.ToString())).ToArray();
+        var expected = implement
+            .GeneratedSources
+            .Concat(expose.GeneratedSources)
+            .Select(static source => (source.HintName, Source: source.SourceText.ToString()))
+            .ToArray();
 
-        foreach (var generators in new IIncrementalGenerator[][]
-        {
-            [new ImplementGenerator(), new ExposeGenerator()],
-            [new ExposeGenerator(), new ImplementGenerator()],
-        })
-        {
-            var result = RunGenerator(Source, generators);
+        var result = RunGenerator(Source, generators);
+        var actual = result
+            .GeneratedSources
+            .Select(static source => (source.HintName, Source: source.SourceText.ToString()))
+            .ToArray();
+        var hintNames = result.GeneratedSources.Select(static source => source.HintName).ToArray();
 
-            AssertSuccessfulGeneration(result);
+        AssertSuccessfulGeneration(result);
+        Assert.Multiple(() =>
+        {
             Assert.That(result.Diagnostics, Is.Empty);
-            Assert.That(result.GeneratedSources.Select(static source => (source.HintName, Source: source.SourceText.ToString())),
-                Is.EquivalentTo(expected));
-        }
+            Assert.That(actual, Has.Length.EqualTo(2));
+            Assert.That(actual, Is.EquivalentTo(expected));
+            Assert.That(hintNames, Is.Unique);
+        });
     }
 
     [Test]
@@ -83,17 +110,24 @@ public sealed class GeneratorIsolationTests
 
         Assert.That(implement.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "MAID0002" }));
         Assert.That(expose.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "MAME0002" }));
-        Assert.That(combined.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EquivalentTo(new[] { "MAID0002", "MAME0002" }));
+        Assert.That(
+            combined.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EquivalentTo(new[] { "MAID0002", "MAME0002" })
+        );
         AssertSuccessfulGeneration(expose);
     }
 
     [Test]
     public void Implement_CompilesWithoutMemberExposureReference()
     {
-        var source = Source.Replace("using Macaron.MemberExposure;", "")
+        var source = Source
+            .Replace("using Macaron.MemberExposure;", "")
             .Replace("[Expose(filter: new[] { \"Value\" })]", "")
             .Replace("class Wrapper", "class Wrapper : IRunner");
-        var result = RunGeneratorWithReferences(source, CreateReferences(typeof(ImplementAttribute)), new ImplementGenerator());
+        var result = RunGeneratorWithReferences(
+            source,
+            CreateReferences(typeof(ImplementAttribute)), new ImplementGenerator()
+        );
 
         AssertSuccessfulGeneration(result);
         Assert.That(result.Diagnostics, Is.Empty);
@@ -104,62 +138,93 @@ public sealed class GeneratorIsolationTests
     [Test]
     public void Expose_CompilesWithoutInterfaceDelegationReference()
     {
-        var source = Source.Replace("using Macaron.InterfaceDelegation;", "")
+        var source = Source
+            .Replace("using Macaron.InterfaceDelegation;", "")
             .Replace("[Implement(typeof(IRunner), Mode = ImplementationMode.Implicit)]", "");
-        var result = RunGeneratorWithReferences(source, CreateReferences(typeof(ExposeAttribute)), new ExposeGenerator());
+        var result = RunGeneratorWithReferences(
+            source,
+            CreateReferences(typeof(ExposeAttribute)), new ExposeGenerator()
+        );
 
         AssertSuccessfulGeneration(result);
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
-        Assert.That(result.OutputCompilation.GetTypeByMetadataName("Macaron.InterfaceDelegation.ImplementAttribute"), Is.Null);
+        Assert.That(
+            result.OutputCompilation.GetTypeByMetadataName("Macaron.InterfaceDelegation.ImplementAttribute"),
+            Is.Null
+        );
     }
 
     [Test]
     public void LegacyAttributeNames_DoNotTriggerEitherGenerator()
     {
-        const string source = """
+        const string source =
+            """
             namespace Macaron.InterfaceDelegation
             {
                 public sealed class ExposeAttribute : System.Attribute { }
+
                 public sealed class LiftAttribute : System.Attribute { }
             }
+
             public partial class Wrapper
             {
                 [Macaron.InterfaceDelegation.Expose]
                 [Macaron.InterfaceDelegation.Lift]
                 private string _value = "";
             }
+
             """;
         var result = RunGenerator(source);
 
         AssertSuccessfulGeneration(result);
         Assert.That(result.GeneratedSources, Is.Empty);
-        Assert.That(result.Diagnostics.Where(static diagnostic => diagnostic.Id.StartsWith("MA", StringComparison.Ordinal)), Is.Empty);
+        Assert.That(
+            result.Diagnostics.Where(static diagnostic => diagnostic.Id.StartsWith("MA", StringComparison.Ordinal)),
+            Is.Empty
+        );
+    }
+
+    [TestCase(typeof(ImplementGenerator), "Macaron.InterfaceDelegation", "Macaron.MemberExposure")]
+    [TestCase(typeof(ExposeGenerator), "Macaron.MemberExposure", "Macaron.InterfaceDelegation")]
+    public void GeneratorAssembly_ExportsOnlyOwnGeneratorWithoutOtherFeatureDependencies(
+        Type generatorType,
+        string ownFeature,
+        string otherFeature
+    )
+    {
+        var assembly = generatorType.Assembly;
+        var registeredGenerators = assembly.GetTypes()
+            .Where(static type => type.IsDefined(typeof(GeneratorAttribute), inherit: false))
+            .ToArray();
+        var referencedAssemblies = assembly
+            .GetReferencedAssemblies()
+            .Select(static reference => reference.Name)
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(registeredGenerators, Is.EqualTo(new[] { generatorType }));
+            Assert.That(referencedAssemblies, Has.None.StartsWith(otherFeature));
+            Assert.That(assembly.GetExportedTypes(), Is.EqualTo(new[] { generatorType }));
+            Assert.That(assembly.GetName().Name, Is.EqualTo(ownFeature + ".Generator"));
+        });
     }
 
     [Test]
-    public void EachAssembly_RegistersOnlyItsOwnGenerator_WithoutOtherFeatureDependencies()
+    public void AttributeAssemblies_KeepPublicApisSeparate()
     {
-        foreach (var (generatorType, ownPrefix, otherPrefix) in new[]
+        Assert.Multiple(() =>
         {
-            (typeof(ImplementGenerator), "Macaron.InterfaceDelegation", "Macaron.MemberExposure"),
-            (typeof(ExposeGenerator), "Macaron.MemberExposure", "Macaron.InterfaceDelegation"),
-        })
-        {
-            var assembly = generatorType.Assembly;
-            var generators = assembly.GetTypes()
-                .Where(static type => type.IsDefined(typeof(GeneratorAttribute), inherit: false));
-
-            Assert.That(generators, Is.EqualTo(new[] { generatorType }));
-            Assert.That(assembly.GetReferencedAssemblies().Select(static reference => reference.Name),
-                Has.None.StartsWith(otherPrefix));
-            Assert.That(assembly.GetExportedTypes(), Is.EqualTo(new[] { generatorType }));
-            Assert.That(assembly.GetName().Name, Is.EqualTo(ownPrefix + ".Generator"));
-        }
-
-        Assert.That(typeof(ImplementAttribute).Assembly, Is.Not.EqualTo(typeof(ExposeAttribute).Assembly));
-        Assert.That(typeof(ImplementAttribute).Assembly.GetExportedTypes(),
-            Is.EquivalentTo(new[] { typeof(ImplementAttribute), typeof(ImplementationMode) }));
-        Assert.That(typeof(ExposeAttribute).Assembly.GetExportedTypes(), Is.EqualTo(new[] { typeof(ExposeAttribute) }));
+            Assert.That(typeof(ImplementAttribute).Assembly, Is.Not.EqualTo(typeof(ExposeAttribute).Assembly));
+            Assert.That(
+                typeof(ImplementAttribute).Assembly.GetExportedTypes(),
+                Is.EquivalentTo(new[] { typeof(ImplementAttribute), typeof(ImplementationMode) })
+            );
+            Assert.That(
+                typeof(ExposeAttribute).Assembly.GetExportedTypes(),
+                Is.EqualTo(new[] { typeof(ExposeAttribute) })
+            );
+        });
     }
 }

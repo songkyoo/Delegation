@@ -46,17 +46,11 @@ internal static class Helper
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
 
-        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())));
-    }
-
-    public static (ImmutableArray<Diagnostic> diagnostics, string generatedCode) CompileAndGetResults(string sourceCode)
-    {
-        var result = RunGenerator(sourceCode);
-        var generatedCode = result.GeneratedSources.Length > 0
-            ? result.GeneratedSources[0].SourceText.ToString()
-            : "";
-
-        return (result.Diagnostics, generatedCode);
+        Assert.That(
+            errors,
+            Is.Empty,
+            string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString()))
+        );
     }
 
     public static GeneratorTestResult RunGenerator(string sourceCode, params IIncrementalGenerator[] generators)
@@ -73,7 +67,11 @@ internal static class Helper
         var runtimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
         return [
             ..((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
-                .Where(path => string.Equals(Path.GetDirectoryName(path), runtimeDirectory, StringComparison.OrdinalIgnoreCase))
+                .Where(path => string.Equals(
+                    Path.GetDirectoryName(path),
+                    runtimeDirectory,
+                    StringComparison.OrdinalIgnoreCase
+                ))
                 .Concat(apiTypes.Select(static type => type.Assembly.Location))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(static path => MetadataReference.CreateFromFile(path))

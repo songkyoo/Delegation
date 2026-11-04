@@ -18,38 +18,46 @@ public class DelegationIncrementalGeneratorTests
     [Test]
     public void ChangingAccessorAccessibility_UpdatesExposeOutputAndPreservesUnrelatedCache()
     {
-        const string target = "public class Target { public int Value { get; private set; } }";
+        const string target = """
+            public class Target
+            {
+                public int Value { get; private set; }
+            }
+            """;
         const string wrapper =
             """
             using Macaron.MemberExposure;
 
             public partial class Wrapper
             {
-                [Expose(filter: new[] { "Value" })] private readonly Target _target = new();
+                [Expose(filter: new[] { "Value" })]
+                private readonly Target _target = new();
             }
             """;
         const string other =
             """
             using Macaron.MemberExposure;
 
-            public class OtherTarget { public int Answer => 42; }
+            public class OtherTarget
+            {
+                public int Answer => 42;
+            }
 
             public partial class OtherWrapper
             {
-                [Expose] private readonly OtherTarget _target = new();
+                [Expose]
+                private readonly OtherTarget _target = new();
             }
             """;
         var compilation = CreateCompilation(("Target.cs", target), ("Wrapper.cs", wrapper), ("Other.cs", other));
         var driver = CreateTrackedDriver();
         var original = Run(ref driver, compilation, out var originalCompilation);
+        var originalSource = GetSources(original)
+            .Select(static source => source.SourceText.ToString())
+            .Single(static source => source.Contains("partial class Wrapper", StringComparison.Ordinal));
 
         AssertNoCompilationErrors(originalCompilation);
-        Assert.That(
-            GetSources(original)
-                .Select(static source => source.SourceText.ToString())
-                .Single(source => source.Contains("partial class Wrapper", StringComparison.Ordinal)),
-            Does.Not.Contain("set => _target.Value")
-        );
+        Assert.That(originalSource, Does.Not.Contain("set => _target.Value"));
 
         var tree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "Target.cs");
         var result = Run(
@@ -60,22 +68,24 @@ public class DelegationIncrementalGeneratorTests
             ),
             out var outputCompilation
         );
+        var generatedSource = GetSources(result)
+            .Select(static source => source.SourceText.ToString())
+            .Single(static source => source.Contains("partial class Wrapper", StringComparison.Ordinal));
+        var sourceReasons = GetReasons(result, "ExposeSourceOutput");
 
         AssertNoCompilationErrors(outputCompilation);
         Assert.Multiple(() =>
         {
             Assert.That(result.Diagnostics, Is.Empty);
+            Assert.That(generatedSource, Does.Contain("set => _target.Value = value;"));
             Assert.That(
-                GetSources(result)
-                    .Select(static source => source.SourceText.ToString())
-                    .Single(source => source.Contains("partial class Wrapper", StringComparison.Ordinal)),
-                Does.Contain("set => _target.Value = value;")
+                sourceReasons,
+                Is.EquivalentTo(new[]
+                {
+                    IncrementalStepRunReason.Modified,
+                    IncrementalStepRunReason.Cached,
+                })
             );
-            Assert.That(GetReasons(result, "ExposeSourceOutput"), Is.EquivalentTo(new[]
-            {
-                IncrementalStepRunReason.Modified,
-                IncrementalStepRunReason.Cached,
-            }));
         });
     }
 
@@ -159,133 +169,80 @@ public class DelegationIncrementalGeneratorTests
         );
     }
 
-    [Test]
-    public void CachesUnchangedOutput_WhenAnotherTargetChanges()
+    [TestCase("Implement", "ImplementSourceOutput", "ImplementAnalysisOutput")]
+    [TestCase("Expose", "ExposeSourceOutput", "ExposeAnalysisOutput")]
+    public void EditingOneTarget_PreservesOtherTargetOutputCache(
+        string attribute,
+        string sourceTrackingName,
+        string analysisTrackingName
+    )
     {
-        const string sourceA =
+        const string contract =
             """
+            public interface IRunner
+            {
+                void Run();
+            }
+            """;
+        var sourceA =
+            $$"""
             using Macaron.InterfaceDelegation;
             using Macaron.MemberExposure;
 
-            public interface IA { void RunA(); }
-
-            public sealed class AImpl : IA { public void RunA() { } }
-
-            public partial class A : IA
+            public partial class A : IRunner
             {
-                [Implement(typeof(IA))]
-                private readonly IA _implA = new AImpl();
+                [{{attribute}}]
+                private readonly IRunner _implA = null!;
             }
             """;
-        const string sourceB =
-            """
+        var sourceB =
+            $$"""
             using Macaron.InterfaceDelegation;
             using Macaron.MemberExposure;
 
-            public interface IB { void RunB(); }
-
-            public sealed class BImpl : IB { public void RunB() { } }
-
-            public partial class B : IB
+            public partial class B : IRunner
             {
-                [Implement(typeof(IB))]
-                private readonly IB _implB = new BImpl();
+                [{{attribute}}]
+                private readonly IRunner _implB = null!;
             }
             """;
-        var compilation = CreateCompilation(("A.cs", sourceA), ("B.cs", sourceB));
+        var compilation = CreateCompilation(("Contract.cs", contract), ("A.cs", sourceA), ("B.cs", sourceB));
         var driver = CreateTrackedDriver();
 
-        _ = Run(ref driver, compilation, out _);
+        Run(ref driver, compilation, out var originalCompilation);
+        AssertNoCompilationErrors(originalCompilation);
 
         var oldTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "A.cs");
-        var oldText = oldTree.GetText();
-        var fieldNameStart = oldText.ToString().IndexOf("_implA", StringComparison.Ordinal);
-        var changedText = oldText.WithChanges(new TextChange(
-            new TextSpan(fieldNameStart, "_implA".Length),
-            "_renamedA"
-        ));
-        var changedTree = oldTree.WithChangedText(changedText);
+        var changedTree = oldTree.WithChangedText(SourceText.From(sourceA.Replace("_implA", "_renamedA")));
         var changedCompilation = compilation.ReplaceSyntaxTree(oldTree, changedTree);
 
         var result = Run(ref driver, changedCompilation, out var outputCompilation);
-        var reasons = GetReasons(result, "ImplementSourceOutput");
-        var analysisReasons = GetReasons(result, "ImplementAnalysisOutput");
+        var sourceReasons = GetReasons(result, sourceTrackingName);
+        var analysisReasons = GetReasons(result, analysisTrackingName);
+        var generatedSources = GetSources(result).Select(static source => source.SourceText.ToString()).ToArray();
 
         AssertNoCompilationErrors(outputCompilation);
         Assert.Multiple(() =>
         {
-            Assert.That(reasons.Count(static reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
-            Assert.That(reasons.Count(static reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
-            Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
-            Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Unchanged), Is.EqualTo(1));
-            Assert.That(GetSources(result), Has.Length.EqualTo(2));
             Assert.That(
-                GetSources(result).Count(static source => source.SourceText.ToString().Contains("_renamedA", StringComparison.Ordinal)),
-                Is.EqualTo(1)
+                sourceReasons,
+                Is.EquivalentTo(new[]
+                {
+                    IncrementalStepRunReason.Modified,
+                    IncrementalStepRunReason.Cached,
+                })
             );
             Assert.That(
-                GetSources(result).Count(static source => source.SourceText.ToString().Contains("_implB", StringComparison.Ordinal)),
-                Is.EqualTo(1)
+                analysisReasons,
+                Is.EquivalentTo(new[]
+                {
+                    IncrementalStepRunReason.Modified,
+                    IncrementalStepRunReason.Unchanged,
+                })
             );
-        });
-    }
-
-    [Test]
-    public void CachesUnchangedExposeOutput_WhenAnotherTargetChanges()
-    {
-        const string sourceA =
-            """
-            using Macaron.InterfaceDelegation;
-            using Macaron.MemberExposure;
-
-            public sealed class ATarget { public void RunA() { } }
-
-            public partial class A
-            {
-                [Expose]
-                private readonly ATarget _implA = new();
-            }
-            """;
-        const string sourceB =
-            """
-            using Macaron.InterfaceDelegation;
-            using Macaron.MemberExposure;
-
-            public sealed class BTarget { public void RunB() { } }
-
-            public partial class B
-            {
-                [Expose]
-                private readonly BTarget _implB = new();
-            }
-            """;
-        var compilation = CreateCompilation(("A.cs", sourceA), ("B.cs", sourceB));
-        var driver = CreateTrackedDriver();
-
-        _ = Run(ref driver, compilation, out _);
-
-        var oldTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "A.cs");
-        var oldText = oldTree.GetText();
-        var fieldNameStart = oldText.ToString().IndexOf("_implA", StringComparison.Ordinal);
-        var changedText = oldText.WithChanges(new TextChange(
-            new TextSpan(fieldNameStart, "_implA".Length),
-            "_renamedA"
-        ));
-        var changedTree = oldTree.WithChangedText(changedText);
-        var changedCompilation = compilation.ReplaceSyntaxTree(oldTree, changedTree);
-
-        var result = Run(ref driver, changedCompilation, out var outputCompilation);
-        var sourceReasons = GetReasons(result, "ExposeSourceOutput");
-        var analysisReasons = GetReasons(result, "ExposeAnalysisOutput");
-
-        AssertNoCompilationErrors(outputCompilation);
-        Assert.Multiple(() =>
-        {
-            Assert.That(sourceReasons.Count(static reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
-            Assert.That(sourceReasons.Count(static reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
-            Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
-            Assert.That(analysisReasons.Count(static reason => reason == IncrementalStepRunReason.Unchanged), Is.EqualTo(1));
-            Assert.That(GetSources(result), Has.Length.EqualTo(2));
+            Assert.That(generatedSources, Has.Length.EqualTo(2));
+            Assert.That(generatedSources, Has.Exactly(1).Contains("_renamedA"));
+            Assert.That(generatedSources, Has.Exactly(1).Contains("_implB"));
         });
     }
 

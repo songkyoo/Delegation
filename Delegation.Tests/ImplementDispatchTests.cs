@@ -15,9 +15,15 @@ public sealed class ImplementDispatchTests
             $$"""
             using Macaron.InterfaceDelegation;
 
-            public interface ITarget { {{contract}} }
+            public interface ITarget
+            {
+                {{contract}}
+            }
 
-            public class Target { {{implementation}} }
+            public class Target
+            {
+                {{implementation}}
+            }
 
             public partial class Wrapper : ITarget
             {
@@ -62,7 +68,7 @@ public sealed class ImplementDispatchTests
         AssertSuccessfulGeneration(result);
         Assert.Multiple(() =>
         {
-            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0006"));
+            Assert.That(result.Diagnostics, Is.Empty);
             Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
             Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("where __T : global::Macaron.Delegation.Tests.IFoo"));
         });
@@ -102,7 +108,7 @@ public sealed class ImplementDispatchTests
         AssertSuccessfulGeneration(result);
         Assert.Multiple(() =>
         {
-            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0006"));
+            Assert.That(result.Diagnostics, Is.Empty);
             Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
             Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("__Run(in _impl)"));
         });
@@ -150,7 +156,7 @@ public sealed class ImplementDispatchTests
         AssertSuccessfulGeneration(result);
         Assert.Multiple(() =>
         {
-            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0006"));
+            Assert.That(result.Diagnostics, Is.Empty);
             Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
             Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("=> _impl.Run(value);"));
         });
@@ -188,7 +194,7 @@ public sealed class ImplementDispatchTests
         AssertSuccessfulGeneration(result);
         Assert.Multiple(() =>
         {
-            Assert.That(result.Diagnostics, Has.None.Matches<Diagnostic>(static diagnostic => diagnostic.Id == "MAID0006"));
+            Assert.That(result.Diagnostics, Is.Empty);
             Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
             Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Contain("__Run(in _impl)"));
             Assert.That(result.GeneratedSources[0].SourceText.ToString(), Does.Not.Contain("Helper"));

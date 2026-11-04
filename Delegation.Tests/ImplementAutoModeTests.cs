@@ -11,9 +11,14 @@ public sealed class ImplementAutoModeTests
     public void UsesAutoAsAttributeDefault()
     {
         Assert.That(new ImplementAttribute().Mode, Is.EqualTo(ImplementationMode.Auto));
-        Assert.That((int)ImplementationMode.Auto, Is.Zero);
-        Assert.That((int)ImplementationMode.Implicit, Is.EqualTo(1));
-        Assert.That((int)ImplementationMode.Explicit, Is.EqualTo(2));
+    }
+
+    [TestCase(ImplementationMode.Auto, 0)]
+    [TestCase(ImplementationMode.Implicit, 1)]
+    [TestCase(ImplementationMode.Explicit, 2)]
+    public void ImplementationMode_PreservesNumericValue(ImplementationMode mode, int expectedValue)
+    {
+        Assert.That((int)mode, Is.EqualTo(expectedValue));
     }
 
     [TestCase("Implement")]
@@ -28,23 +33,31 @@ public sealed class ImplementAutoModeTests
             public interface IContract
             {
                 int GetValue();
+
                 int Value { get; }
+
                 event EventHandler? Changed;
+
                 void Run();
             }
 
             public sealed class Implementation : IContract
             {
                 public int GetValue() => 42;
+
                 public int Value => 42;
+
                 public event EventHandler? Changed;
+
                 public void Run() { }
             }
 
             public abstract class Base
             {
                 public abstract int GetValue();
+
                 public abstract int Value { get; }
+
                 public abstract event EventHandler? Changed;
             }
 
@@ -56,6 +69,7 @@ public sealed class ImplementAutoModeTests
             """
         );
 
+        AssertSuccessfulGeneration(result);
         Assert.That(result.GeneratedSources, Has.Length.EqualTo(1));
 
         var generated = result.GeneratedSources[0].SourceText.ToString();
@@ -67,6 +81,5 @@ public sealed class ImplementAutoModeTests
             Assert.That(generated, Does.Contain("public override event global::System.EventHandler? Changed"));
             Assert.That(generated, Does.Contain("void global::IContract.Run()"));
         });
-        AssertSuccessfulGeneration(result);
     }
 }
